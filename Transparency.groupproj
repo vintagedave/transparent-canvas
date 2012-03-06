@@ -1,0 +1,36 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{0FF7DCDE-D338-4A27-A290-1E089B76E201}</ProjectGuid>
+		</PropertyGroup>
+		<ItemGroup>
+			<Projects Include="TransparentDemo.dproj">
+				<Dependencies/>
+			</Projects>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Default.Personality.12</Borland.Personality>
+			<Borland.ProjectType/>
+			<BorlandProject>
+				<Default.Personality/>
+			</BorlandProject>
+		</ProjectExtensions>
+		<Target Name="TransparentDemo">
+			<MSBuild Projects="TransparentDemo.dproj"/>
+		</Target>
+		<Target Name="TransparentDemo:Clean">
+			<MSBuild Targets="Clean" Projects="TransparentDemo.dproj"/>
+		</Target>
+		<Target Name="TransparentDemo:Make">
+			<MSBuild Targets="Make" Projects="TransparentDemo.dproj"/>
+		</Target>
+		<Target Name="Build">
+			<CallTarget Targets="TransparentDemo"/>
+		</Target>
+		<Target Name="Clean">
+			<CallTarget Targets="TransparentDemo:Clean"/>
+		</Target>
+		<Target Name="Make">
+			<CallTarget Targets="TransparentDemo:Make"/>
+		</Target>
+		<Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+	</Project>
