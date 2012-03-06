@@ -3,7 +3,7 @@
 			<ProjectGuid>{0FF7DCDE-D338-4A27-A290-1E089B76E201}</ProjectGuid>
 		</PropertyGroup>
 		<ItemGroup>
-			<Projects Include="TransparentDemo.dproj">
+			<Projects Include="demo\TransparentDemo.dproj">
 				<Dependencies/>
 			</Projects>
 		</ItemGroup>
@@ -15,13 +15,13 @@
 			</BorlandProject>
 		</ProjectExtensions>
 		<Target Name="TransparentDemo">
-			<MSBuild Projects="TransparentDemo.dproj"/>
+			<MSBuild Projects="demo\TransparentDemo.dproj"/>
 		</Target>
 		<Target Name="TransparentDemo:Clean">
-			<MSBuild Targets="Clean" Projects="TransparentDemo.dproj"/>
+			<MSBuild Targets="Clean" Projects="demo\TransparentDemo.dproj"/>
 		</Target>
 		<Target Name="TransparentDemo:Make">
-			<MSBuild Targets="Make" Projects="TransparentDemo.dproj"/>
+			<MSBuild Targets="Make" Projects="demo\TransparentDemo.dproj"/>
 		</Target>
 		<Target Name="Build">
 			<CallTarget Targets="TransparentDemo"/>
