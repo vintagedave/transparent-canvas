@@ -22,7 +22,12 @@ unit TransparentCanvas;
 
 interface
 
-uses Windows, SysUtils, Classes, Controls, Graphics, Types;
+uses
+  Windows, SysUtils, Classes, Controls, Graphics, Types
+  {$if CompilerVersion >= 16.0} // XE2
+    , UITypes // Let inline function TFont.GetStyle be expanded
+  {$ifend}
+  ;
 
 type
   ETransparentCanvasException = class(Exception)
@@ -32,9 +37,10 @@ type
     constructor Create(Color : TColor);
     procedure Clear;
     function WrittenByGDI : Boolean;
-    procedure SetAlpha(Transparency : Byte; PreMult : Single);
+    procedure SetAlpha(const Transparency : Byte; const PreMult : Single);
     function AsColorRef : COLORREF;
-    procedure SetFromColorRef(Color : COLORREF);
+    procedure SetFromColorRef(const Color : COLORREF);
+    procedure SetFromColorMultAlpha(const Color : TQuadColor);
 
     case Boolean of
       True : (Blue,
@@ -52,7 +58,7 @@ type
     FPen : HPEN;
     FFont : HFONT;
   public
-    constructor CreateWithHandles(hBrush : HBRUSH; hPen : HPEN; hFont : HFONT);
+    constructor CreateWithHandles(const hBrush : HBRUSH; const hPen : HPEN; const hFont : HFONT);
     property Brush : HBRUSH read FBrush;
     property Pen : HPEN read FPen;
     property Font : HFONT read FFont;
@@ -72,7 +78,8 @@ type
   public
     constructor CreateBlank(DC: HDC; Width, Height: Integer);
     // The DummyX parameters are to avoid duplicate constructors with the same parameter list being
-    // inaccessible from C++
+    // inaccessible from C++, although only necessary if you write C++ code that uses this (internal)
+    // class
     constructor CreateForGDI(DC: HDC; Width, Height: Integer; DummyGDI : Byte = 0);
     constructor CreateForDrawThemeTextEx(DC: HDC; Width, Height: Integer; DummyDrawThemeTextEx : SmallInt = 0);
     constructor Create(var ToCopy : TAlphaBitmapWrapper);
@@ -85,13 +92,14 @@ type
     procedure ProcessTransparency(const Alpha: Byte); overload;
     procedure ProcessTransparency(const Alpha: Byte; TranspRect : TRect); overload;
     procedure ProcessMaskTransparency(var MaskImage: TAlphaBitmapWrapper);
+    procedure TintByAlphaToColor(const Color : TQuadColor);
     procedure BlendTo(X, Y: Integer; var Image: TAlphaBitmapWrapper; Transparency: Byte = $FF);
     procedure BlendToStretch(X, Y, StretchWidth, StretchHeight: Integer;
       var Image: TAlphaBitmapWrapper; Transparency: Byte);
     procedure BlendToDC(X, Y : Integer; DC : HDC; Transparency : Byte = $FF);
 
-    function GetRawPixelPtr(X, Y : Integer) : PQuadColor;
-    procedure SafeSetRawPixel(X, Y : Integer; Color : TQuadColor);
+    function GetRawPixelPtr(const X, Y : Integer) : PQuadColor;
+    procedure SafeSetRawPixel(const X, Y : Integer; Color : TQuadColor);
   published
     property Handle : HDC read FDCHandle;
     property BitmapHandle : HBitmap read FBMPHandle;
@@ -133,6 +141,8 @@ type
     procedure TextOutPreVista(const Rect : TRect; const Text: string; const Alpha : Byte);
     procedure TextOutVistaPlus(const ARect : TRect; const Text: string; const Alpha : Byte);
     function CanUseDrawThemeTextEx : boolean;
+    procedure InternalGlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
+      const Alpha: Byte; const ProcessBackColor : Boolean; const BackColor : TQuadColor);
   protected
     FWorkingCanvas : TAlphaBitmapWrapper;
 
@@ -164,6 +174,8 @@ type
 
     function CanDrawGlowText : boolean;
     procedure GlowTextOut(const X, Y, GlowSize: Integer; const Text: string; const Alpha : Byte = $FF);
+    procedure GlowTextOutBackColor(const X, Y, GlowSize: Integer; const Text: string; const BackColor : TColor;
+      const GlowAlpha : Byte = $FF; const Alpha : Byte = $FF);
 
     procedure Clear;
 
@@ -196,6 +208,15 @@ implementation
 uses
   Math, Themes, UxTheme;
 
+function InternalStyleServices : TCustomStyleServices;
+begin
+  {$if declared(StyleServices)}
+    Result := StyleServices;
+  {$else}
+    Result := ThemeServices; // Deprecated in favour of StyleServices
+  {$ifend}
+end;
+
 { TCustomTransparentCanvas }
 
 function TCustomTransparentCanvas.CanDrawGlowText: boolean;
@@ -205,7 +226,13 @@ end;
 
 function TCustomTransparentCanvas.CanUseDrawThemeTextEx: boolean;
 begin
-  Result := ThemeServices.ThemesEnabled and (Win32MajorVersion >= 6);
+  Result :=
+    {$if declared(StyleServices)} // Can't test TCustomStyleServices.Enabled, assume deprecation follows StyleServices
+      InternalStyleServices.Enabled
+    {$else}
+      InternalStyleServices.ThemesEnabled
+    {$ifend}
+    and (Win32MajorVersion >= 6);
 end;
 
 procedure TCustomTransparentCanvas.Clear;
@@ -345,8 +372,8 @@ begin
   Result := FWorkingCanvas.FWidth;
 end;
 
-procedure TCustomTransparentCanvas.GlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
-  const Alpha: Byte);
+procedure TCustomTransparentCanvas.InternalGlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
+  const Alpha: Byte; const ProcessBackColor : Boolean; const BackColor : TQuadColor);
 var
   TempImage : TAlphaBitmapWrapper;
   TextSize : TSize;
@@ -369,17 +396,52 @@ begin
 		Options.crText := ColorToRGB(Font.Color);
 		Options.iGlowSize := GlowSize;
 
-		Details := ThemeServices.GetElementDetails(teEditTextNormal);
+		Details := InternalStyleServices.GetElementDetails(teEditTextNormal);
     TextRect := Rect(GlowSize, GlowSize, TextSize.cx + GlowSize*2, TextSize.cy + GlowSize*2);
-    DrawThemeTextEx(ThemeServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
+    DrawThemeTextEx(InternalStyleServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
       PChar(Text), Length(Text), DT_LEFT or DT_TOP or DT_NOCLIP, TextRect,
       Options);
+
+    if ProcessBackColor then begin
+      TempImage.TintByAlphaToColor(BackColor);
+      // Now draw the text over again, but with no glow, so only the text is drawn
+      TextRect := Rect(GlowSize, GlowSize, TextSize.cx + GlowSize, TextSize.cy + GlowSize);
+      Options.dwFlags := DTT_TEXTCOLOR or DTT_COMPOSITED;
+      Options.crText := ColorToRGB(Font.Color);
+      Options.iGlowSize := 0;
+      DrawThemeTextEx(InternalStyleServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
+        PChar(Text), Length(Text), DT_LEFT or DT_TOP or DT_NOCLIP, TextRect,
+        Options);
+    end;
 
     TempImage.BlendTo(X - GlowSize, Y - GlowSize, FWorkingCanvas, Alpha);
     SetBkMode(TempImage.FDCHandle, OPAQUE);
     TempImage.SelectOriginalObjects;
   finally
     TempImage.Free;
+  end;
+end;
+
+procedure TCustomTransparentCanvas.GlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
+  const Alpha: Byte);
+begin
+  InternalGlowTextOut(X, Y, GlowSize, Text, Alpha, False, TQuadColor.Create(0));
+end;
+
+procedure TCustomTransparentCanvas.GlowTextOutBackColor(const X, Y, GlowSize: Integer;
+  const Text: string; const BackColor: TColor; const GlowAlpha : Byte; const Alpha: Byte);
+var
+  Background : TQuadColor;
+begin
+  if (COLORREF(ColorToRGB(BackColor)) = RGB(255, 255, 255)) and (GlowAlpha = 255) then begin // White is the default on Windows; do no special processing
+    GlowTextOut(X, Y, GlowSize, Text, Alpha);
+  end else begin
+    // Windows draws glowing text with a white background, always.  To change the background colour,
+    // draw with the normal white background and black text, then process the colours to change
+    // white to the specified colour, and black to the font colour
+    Background := TQuadColor.Create(BackColor);
+    Background.SetAlpha(GlowAlpha, Alpha / 255.0);
+    InternalGlowTextOut(X, Y, GlowSize, Text, Alpha, True, Background);
   end;
 end;
 
@@ -595,9 +657,9 @@ begin
 		Options.crText := ColorToRGB(Font.Color);
 		Options.iGlowSize := 0;
 
-		Details := ThemeServices.GetElementDetails(teEditTextNormal);
+		Details := InternalStyleServices.GetElementDetails(teEditTextNormal);
     TextRect := Rect(0, 0, TextSize.cx, TextSize.cy);
-    DrawThemeTextEx(ThemeServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
+    DrawThemeTextEx(InternalStyleServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
       PChar(Text), Length(Text), DT_LEFT or DT_TOP, TextRect,
       Options);
 
@@ -752,6 +814,24 @@ begin
   inherited;
 end;
 
+procedure TAlphaBitmapWrapper.TintByAlphaToColor(const Color: TQuadColor);
+var
+  Loop : Integer;
+  PQuad : PQuadColor;
+begin
+  // Change the background colour of glowing text by changing white to BackColor, and black to
+  // TextColor.  Alpha remains the same
+  GdiFlush; // Need to flush before any manipulation of bits
+  PQuad := FQuads;
+  for Loop := 0 to FWidth * FHeight - 1 do begin
+    if PQuad.Alpha <> 0 then begin
+      PQuad.SetFromColorMultAlpha(Color); // Sets the colour, and multiplies the alphas together
+      //PQuad.SetFromColorRef(Color); // Sets the colour but keeps the current alpha
+    end;
+    Inc(PQuad);
+  end;
+end;
+
 procedure TAlphaBitmapWrapper.ProcessMaskTransparency(var MaskImage: TAlphaBitmapWrapper);
 var
   Loop : Integer;
@@ -824,7 +904,7 @@ begin
   Result := FQuads;
 end;
 
-function TAlphaBitmapWrapper.GetRawPixelPtr(X, Y: Integer): PQuadColor;
+function TAlphaBitmapWrapper.GetRawPixelPtr(const X, Y: Integer): PQuadColor;
 var
   PQuad : PQuadColor;
   InverseY : Integer;
@@ -839,7 +919,7 @@ begin
   end;
 end;
 
-procedure TAlphaBitmapWrapper.SafeSetRawPixel(X, Y: Integer; Color: TQuadColor);
+procedure TAlphaBitmapWrapper.SafeSetRawPixel(const X, Y: Integer; Color: TQuadColor);
 var
   PQuad : PQuadColor;
   InverseY : Integer;
@@ -916,7 +996,7 @@ begin
   Quad := Cardinal(ColorToRGB(Color)) or $FF000000;
 end;
 
-procedure TQuadColor.SetAlpha(Transparency: Byte; PreMult: Single);
+procedure TQuadColor.SetAlpha(const Transparency: Byte; const PreMult: Single);
 begin
   Alpha := Transparency;
   Blue := Trunc(Blue * PreMult);
@@ -924,14 +1004,28 @@ begin
   Red := Trunc(Red * PreMult);
 end;
 
-procedure TQuadColor.SetFromColorRef(Color: COLORREF);
+procedure TQuadColor.SetFromColorRef(const Color: COLORREF);
 begin
-  Quad := Color;
+  // Sets the colour, but keeps the current alpha
   if Alpha = 0 then begin
     Quad := 0;
   end else begin
+    Red := GetRValue(Color);
+    Green := GetGValue(Color);
+    Blue := GetBValue(Color);
     SetAlpha(Alpha, Alpha / 255.0);
   end;
+end;
+
+procedure TQuadColor.SetFromColorMultAlpha(const Color: TQuadColor);
+var
+  MultAlpha : Byte;
+begin
+  Red := Color.Red;
+  Green := Color.Green;
+  Blue := Color.Blue;
+  MultAlpha := Round(Integer(Alpha) * Integer(Color.Alpha) / 255.0);
+  SetAlpha(MultAlpha, MultAlpha / 255.0);
 end;
 
 function TQuadColor.WrittenByGDI: Boolean;
@@ -969,7 +1063,7 @@ end;
 
 { TGDIObjects }
 
-constructor TGDIObjects.CreateWithHandles(hBrush: HBRUSH; hPen: HPEN; hFont : HFONT);
+constructor TGDIObjects.CreateWithHandles(const hBrush: HBRUSH; const hPen: HPEN; const hFont : HFONT);
 begin
   FBrush := hBrush;
   FPen := hPen;
