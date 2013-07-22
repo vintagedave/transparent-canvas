@@ -24,7 +24,7 @@ interface
 
 uses
   Windows, SysUtils, Classes, Controls, Graphics, Types
-  {$if CompilerVersion >= 16.0} // XE2
+  {$if CompilerVersion >= 23.0} // XE2
     , UITypes // Let inline function TFont.GetStyle be expanded
   {$ifend}
   ;
@@ -208,14 +208,21 @@ implementation
 uses
   Math, Themes, UxTheme;
 
-function InternalStyleServices : TCustomStyleServices;
-begin
-  {$if declared(StyleServices)}
-    Result := StyleServices;
-  {$else}
-    Result := ThemeServices; // Deprecated in favour of StyleServices
-  {$ifend}
-end;
+{$if CompilerVersion >= 23.0} // XE2
+  function InternalStyleServices : TCustomStyleServices;
+  begin
+    {$if declared(StyleServices)}
+      Result := StyleServices;
+    {$else}
+      Result := ThemeServices; // Deprecated in favour of StyleServices
+    {$ifend}
+  end;
+{$else}
+  function InternalStyleServices : TThemeServices;
+  begin
+    Result := ThemeServices;
+  end;
+{$ifend}
 
 { TCustomTransparentCanvas }
 

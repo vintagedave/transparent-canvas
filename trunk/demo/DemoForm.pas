@@ -3,9 +3,9 @@ unit DemoForm;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Imaging.pngimage, Vcl.ExtCtrls, TransparentCanvas,
-  Vcl.ComCtrls, Vcl.StdCtrls;
+  Windows, Messages, SysUtils, Variants, Classes, Graphics,
+  Controls, Forms, Dialogs, pngimage, ExtCtrls, TransparentCanvas,
+  ComCtrls, StdCtrls;
 
 type
   TfrmDemo = class(TForm)
