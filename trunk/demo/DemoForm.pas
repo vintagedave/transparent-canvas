@@ -128,8 +128,10 @@ begin
 
     // Draw glowing text (Vista+ text with a hazy background) if possible
     TransCanvas.Font.Color := clBlack;
-    if TransCanvas.CanDrawGlowText then
+    if TransCanvas.CanDrawGlowText then begin
       TransCanvas.GlowTextOut(60, 50, 4, 'Test glowing text', TextTrackBar.Position);
+      TransCanvas.GlowTextOutBackColor(60, 75, 4, 'Test glowing text with background color', clLime, AlphaTrackBar.Position, TextTrackBar.Position);
+    end;
 
     // Draw some rectangles and rounded rectangles
     TransCanvas.Brush.Color := clRed;
