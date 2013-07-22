@@ -43,6 +43,7 @@ type
     procedure SetFromColorMultAlpha(const Color : TQuadColor);
 
     case Boolean of
+      // These values are not in the same order as COLORREF RGB values - don't assign from a COLORREF directly
       True : (Blue,
               Green,
               Red,
@@ -833,7 +834,6 @@ begin
   for Loop := 0 to FWidth * FHeight - 1 do begin
     if PQuad.Alpha <> 0 then begin
       PQuad.SetFromColorMultAlpha(Color); // Sets the colour, and multiplies the alphas together
-      //PQuad.SetFromColorRef(Color); // Sets the colour but keeps the current alpha
     end;
     Inc(PQuad);
   end;
@@ -999,8 +999,14 @@ begin
 end;
 
 constructor TQuadColor.Create(Color: TColor);
+var
+  ColorRGB : COLORREF;
 begin
-  Quad := Cardinal(ColorToRGB(Color)) or $FF000000;
+  Alpha := 255;
+  ColorRGB := ColorToRGB(Color);
+  Red := GetRValue(ColorRGB);
+  Green := GetGValue(ColorRGB);
+  Blue := GetBValue(ColorRGB);
 end;
 
 procedure TQuadColor.SetAlpha(const Transparency: Byte; const PreMult: Single);
