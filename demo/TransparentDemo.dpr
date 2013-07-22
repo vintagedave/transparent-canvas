@@ -2,13 +2,13 @@ program TransparentDemo;
 
 uses
   Forms,
-  Unit1 in 'Unit1.pas' {Form1},
-  TransparentCanvas in '..\TransparentCanvas.pas';
+  TransparentCanvas in '..\TransparentCanvas.pas',
+  DemoForm in 'DemoForm.pas' {frmDemo};
 
 {$R *.res}
 
 begin
   Application.Initialize;
-  Application.CreateForm(TForm1, Form1);
+  Application.CreateForm(TfrmDemo, frmDemo);
   Application.Run;
 end.
