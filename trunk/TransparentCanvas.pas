@@ -22,7 +22,7 @@ unit TransparentCanvas;
 
 interface
 
-uses Windows, SysUtils, Classes, Controls, Graphics;
+uses Windows, SysUtils, Classes, Controls, Graphics, Types;
 
 type
   ETransparentCanvasException = class(Exception)
@@ -71,8 +71,10 @@ type
     procedure Clear;
   public
     constructor CreateBlank(DC: HDC; Width, Height: Integer);
-    constructor CreateForGDI(DC: HDC; Width, Height: Integer);
-    constructor CreateForDrawThemeTextEx(DC: HDC; Width, Height: Integer);
+    // The DummyX parameters are to avoid duplicate constructors with the same parameter list being
+    // inaccessible from C++
+    constructor CreateForGDI(DC: HDC; Width, Height: Integer; DummyGDI : Byte = 0);
+    constructor CreateForDrawThemeTextEx(DC: HDC; Width, Height: Integer; DummyDrawThemeTextEx : SmallInt = 0);
     constructor Create(var ToCopy : TAlphaBitmapWrapper);
     destructor Destroy; override;
 
@@ -683,6 +685,8 @@ var
 begin
   FWidth := Width;
   FHeight := Height;
+  if (FWidth <= 0) or (FHeight <= 0) then
+    raise ETransparentCanvasException.Create('Invalid size specified; Width and Height must both be greater than zero.');
   FDCHandle := CreateCompatibleDC(DC);
   ZeroMemory(@BMPInfo, SizeOf(TBitmapInfo));
   with BMPInfo.bmiHeader do begin
@@ -719,21 +723,19 @@ begin
   ToCopy.BlendTo(0, 0, Self);
 end;
 
-constructor TAlphaBitmapWrapper.CreateBlank(DC: HDC; Width,
-  Height: Integer);
+constructor TAlphaBitmapWrapper.CreateBlank(DC: HDC; Width, Height: Integer);
 begin
   inherited Create();
   Construct(DC, true, Width, Height); // true = init to all zeroes
 end;
 
-constructor TAlphaBitmapWrapper.CreateForDrawThemeTextEx(DC: HDC; Width, Height: Integer);
+constructor TAlphaBitmapWrapper.CreateForDrawThemeTextEx(DC: HDC; Width, Height: Integer; DummyDrawThemeTextEx : SmallInt = 0);
 begin
   inherited Create();
   Construct(DC, true, Width, Height, true); // init to all zeroes; inverted (upside down) because DrawThemeTextEx needs it
 end;
 
-constructor TAlphaBitmapWrapper.CreateForGDI(DC: HDC; Width,
-  Height: Integer);
+constructor TAlphaBitmapWrapper.CreateForGDI(DC: HDC; Width, Height: Integer; DummyGDI : Byte = 0);
 begin
   inherited Create();
   Construct(DC, false, Width, Height); // false = init all bytes to $FF, so can test if written to

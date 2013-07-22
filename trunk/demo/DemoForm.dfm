@@ -1,13 +1,12 @@
-object Form1: TForm1
+object frmDemo: TfrmDemo
   Left = 0
   Top = 0
-  BorderIcons = [biSystemMenu, biMinimize]
-  Caption = 'Transparent Canvas Demo'
-  ClientHeight = 585
-  ClientWidth = 699
-  Color = clWindow
-  Constraints.MinHeight = 200
-  Constraints.MinWidth = 200
+  BorderStyle = bsSingle
+  Caption = 'TTransparentCanvas demo'
+  ClientHeight = 372
+  ClientWidth = 645
+  Color = clWhite
+  DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
@@ -16,17 +15,16 @@ object Form1: TForm1
   GlassFrame.Enabled = True
   GlassFrame.Top = 50
   OldCreateOrder = False
-  Position = poDesktopCenter
-  ShowHint = True
-  OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnPaint = FormPaint
-  OnShow = FormShow
+  DesignSize = (
+    645
+    372)
   PixelsPerInch = 96
   TextHeight = 13
   object LoadedImage: TImage
-    Left = 296
-    Top = 517
+    Left = -717
+    Top = 54
     Width = 800
     Height = 450
     AutoSize = True
@@ -26977,370 +26975,181 @@ object Form1: TForm1
     Visible = False
   end
   object PaintBox: TPaintBox
-    Left = 10
-    Top = 10
-    Width = 165
-    Height = 117
-    OnClick = PaintBoxClick
-    OnPaint = PaintBoxPaint
-  end
-  object Panel1: TPanel
     AlignWithMargins = True
-    Left = 514
+    Left = 0
     Top = 50
-    Width = 185
-    Height = 535
+    Width = 460
+    Height = 322
     Margins.Left = 0
     Margins.Top = 50
-    Margins.Right = 0
+    Margins.Right = 185
     Margins.Bottom = 0
-    Align = alRight
-    BevelOuter = bvNone
+    Align = alClient
+    OnPaint = PaintBoxPaint
+    ExplicitLeft = -5
+    ExplicitTop = 45
+    ExplicitWidth = 455
+  end
+  object Label10: TLabel
+    Left = 595
+    Top = 286
+    Width = 38
+    Height = 13
+    Alignment = taRightJustify
+    Anchors = [akTop, akRight]
+    Caption = 'Opaque'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+  end
+  object Label11: TLabel
+    Left = 471
+    Top = 314
+    Width = 152
+    Height = 13
+    Caption = 'Composition transparency:'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object Label12: TLabel
+    Left = 477
+    Top = 352
+    Width = 59
+    Height = 13
+    Caption = 'Transparent'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+  end
+  object Label13: TLabel
+    Left = 595
+    Top = 352
+    Width = 38
+    Height = 13
+    Alignment = taRightJustify
+    Anchors = [akTop, akRight]
+    Caption = 'Opaque'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+  end
+  object Label3: TLabel
+    Left = 471
+    Top = 248
+    Width = 108
+    Height = 13
+    Caption = 'Text transparency:'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object Label6: TLabel
+    Left = 471
+    Top = 182
+    Width = 119
+    Height = 13
+    Caption = 'Object transparency:'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object Label7: TLabel
+    Left = 471
+    Top = 220
+    Width = 59
+    Height = 13
+    Caption = 'Transparent'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+  end
+  object Label8: TLabel
+    Left = 595
+    Top = 220
+    Width = 38
+    Height = 13
+    Alignment = taRightJustify
+    Anchors = [akTop, akRight]
+    Caption = 'Opaque'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+  end
+  object Label9: TLabel
+    Left = 477
+    Top = 286
+    Width = 59
+    Height = 13
+    Caption = 'Transparent'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+  end
+  object AlphaTrackBar: TTrackBar
+    Left = 471
+    Top = 198
+    Width = 169
+    Height = 24
+    Max = 255
+    PageSize = 25
+    Position = 160
+    PositionToolTip = ptTop
     TabOrder = 0
-    object PageControl1: TPageControl
-      Left = 0
-      Top = 0
-      Width = 185
-      Height = 535
-      ActivePage = TabSheet1
-      Align = alClient
-      DoubleBuffered = True
-      ParentDoubleBuffered = False
-      TabOrder = 0
-      object TabSheet1: TTabSheet
-        Caption = 'Transparency'
-        DoubleBuffered = True
-        ParentDoubleBuffered = False
-        DesignSize = (
-          177
-          507)
-        object Label11: TLabel
-          Left = 3
-          Top = 340
-          Width = 129
-          Height = 13
-          Caption = 'Composition transparency:'
-        end
-        object Label12: TLabel
-          Left = 9
-          Top = 386
-          Width = 59
-          Height = 13
-          Caption = 'Transparent'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = []
-          ParentFont = False
-        end
-        object Label13: TLabel
-          Left = 127
-          Top = 386
-          Width = 38
-          Height = 13
-          Alignment = taRightJustify
-          Anchors = [akTop, akRight]
-          Caption = 'Opaque'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = []
-          ParentFont = False
-        end
-        object Label6: TLabel
-          Left = 3
-          Top = 208
-          Width = 103
-          Height = 13
-          Caption = 'Object transparency:'
-        end
-        object Label7: TLabel
-          Left = 9
-          Top = 254
-          Width = 59
-          Height = 13
-          Caption = 'Transparent'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = []
-          ParentFont = False
-        end
-        object Label8: TLabel
-          Left = 127
-          Top = 254
-          Width = 38
-          Height = 13
-          Alignment = taRightJustify
-          Anchors = [akTop, akRight]
-          Caption = 'Opaque'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = []
-          ParentFont = False
-        end
-        object Label3: TLabel
-          Left = 3
-          Top = 274
-          Width = 93
-          Height = 13
-          Caption = 'Text transparency:'
-        end
-        object Label9: TLabel
-          Left = 9
-          Top = 320
-          Width = 59
-          Height = 13
-          Caption = 'Transparent'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = []
-          ParentFont = False
-        end
-        object Label10: TLabel
-          Left = 127
-          Top = 320
-          Width = 38
-          Height = 13
-          Alignment = taRightJustify
-          Anchors = [akTop, akRight]
-          Caption = 'Opaque'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = []
-          ParentFont = False
-        end
-        object AlphaTrackBar: TTrackBar
-          Left = 3
-          Top = 224
-          Width = 169
-          Height = 24
-          Max = 255
-          PageSize = 25
-          Position = 128
-          PositionToolTip = ptTop
-          TabOrder = 0
-          TickStyle = tsNone
-          OnChange = AlphaTrackBarChange
-        end
-        object CompositionAlphaTrackBar: TTrackBar
-          Left = 3
-          Top = 356
-          Width = 169
-          Height = 24
-          Max = 255
-          PageSize = 25
-          Position = 255
-          PositionToolTip = ptTop
-          TabOrder = 1
-          TickStyle = tsNone
-          OnChange = AlphaTrackBarChange
-        end
-        object Panel2: TPanel
-          Left = 0
-          Top = 0
-          Width = 177
-          Height = 210
-          BevelOuter = bvNone
-          TabOrder = 2
-          DesignSize = (
-            177
-            210)
-          object FinalColorPaintBox: TPaintBox
-            Left = 114
-            Top = 170
-            Width = 56
-            Height = 16
-            Hint = 'Color, plus red, green and blue channels'
-            OnPaint = ColorPaintBoxPaint
-          end
-          object TransRawColorLabel: TLabel
-            Left = 82
-            Top = 150
-            Width = 88
-            Height = 13
-            Alignment = taRightJustify
-            Caption = 'A:0, R:0, G:0, B:0'
-          end
-          object Label4: TLabel
-            Left = 3
-            Top = 133
-            Width = 92
-            Height = 13
-            Caption = 'Transparent (raw):'
-          end
-          object ClickCoordsLabel: TLabel
-            Left = 3
-            Top = 0
-            Width = 162
-            Height = 47
-            Anchors = [akLeft, akTop, akRight]
-            AutoSize = False
-            Caption = 
-              'Click the image to examine a pixel. Showing details for (X:100, ' +
-              'Y:100).'
-            WordWrap = True
-          end
-          object Label5: TLabel
-            Left = 3
-            Top = 171
-            Width = 57
-            Height = 13
-            Caption = 'Final image:'
-          end
-          object FinalColorLabel: TLabel
-            Left = 82
-            Top = 187
-            Width = 88
-            Height = 13
-            Alignment = taRightJustify
-            Caption = 'A:0, R:0, G:0, B:0'
-          end
-          object TransRawColorPaintBox: TPaintBox
-            Left = 101
-            Top = 132
-            Width = 70
-            Height = 16
-            Hint = 
-              'AlphaBlend()-compatible (perpixel premultiplied alpha): Alphable' +
-              'nded over white/black; alpha value as greyscale; red, green and ' +
-              'blue channels'
-            OnPaint = TransColorPaintBoxPaint
-          end
-          object BaseColorLabel: TLabel
-            Left = 82
-            Top = 76
-            Width = 88
-            Height = 13
-            Alignment = taRightJustify
-            Caption = 'A:0, R:0, G:0, B:0'
-          end
-          object BaseColorPaintBox: TPaintBox
-            Left = 114
-            Top = 56
-            Width = 56
-            Height = 16
-            Hint = 'Color, plus red, green and blue channels'
-            OnPaint = ColorPaintBoxPaint
-          end
-          object Label1: TLabel
-            Left = 3
-            Top = 57
-            Width = 58
-            Height = 13
-            Caption = 'Base image:'
-          end
-          object TransColorLabel: TLabel
-            Left = 82
-            Top = 113
-            Width = 88
-            Height = 13
-            Alignment = taRightJustify
-            Caption = 'A:0, R:0, G:0, B:0'
-          end
-          object TransColorPaintBox: TPaintBox
-            Left = 100
-            Top = 94
-            Width = 70
-            Height = 16
-            Hint = 
-              'Standard four-component color: Alphablended over white/black; al' +
-              'pha value as greyscale; red, green and blue channels'
-            OnPaint = TransColorPaintBoxPaint
-          end
-          object Label2: TLabel
-            Left = 3
-            Top = 95
-            Width = 63
-            Height = 13
-            Caption = 'Transparent:'
-          end
-        end
-        object TextTrackBar: TTrackBar
-          Left = 3
-          Top = 290
-          Width = 169
-          Height = 24
-          Max = 255
-          PageSize = 25
-          Position = 255
-          PositionToolTip = ptTop
-          TabOrder = 3
-          TickStyle = tsNone
-          OnChange = AlphaTrackBarChange
-        end
-        object GridCheckBox: TCheckBox
-          Left = 3
-          Top = 404
-          Width = 97
-          Height = 17
-          Caption = 'Draw grid'
-          TabOrder = 4
-          OnClick = GridCheckBoxClick
-        end
-      end
-      object TabSheet2: TTabSheet
-        Caption = 'Image'
-        ImageIndex = 1
-        ExplicitLeft = 0
-        ExplicitTop = 0
-        ExplicitWidth = 0
-        ExplicitHeight = 0
-        object Bevel1: TBevel
-          Left = 8
-          Top = 8
-          Width = 169
-          Height = 121
-        end
-        object PreviewPaintBox: TPaintBox
-          Left = 10
-          Top = 10
-          Width = 165
-          Height = 117
-          OnPaint = PreviewPaintBoxPaint
-        end
-        object Button1: TButton
-          Left = 80
-          Top = 133
-          Width = 97
-          Height = 25
-          Caption = 'Load Image...'
-          TabOrder = 0
-          OnClick = Button1Click
-        end
-        object Button2: TButton
-          Left = 3
-          Top = 164
-          Width = 171
-          Height = 25
-          Caption = 'Save text with background'
-          TabOrder = 1
-          OnClick = Button2Click
-        end
-      end
-    end
+    TickStyle = tsNone
+    OnChange = TrackBarChange
   end
-  object OpenPictureDialog: TOpenPictureDialog
-    Filter = 
-      'Bitmap images|*.bmp|JPEG images|*.jpg, *.jpeg|All images|*.bmp, ' +
-      '*.jpg, *.jpeg|All files|*.*'
-    Options = [ofHideReadOnly, ofFileMustExist, ofEnableSizing]
-    Left = 40
-    Top = 8
+  object CompositionAlphaTrackBar: TTrackBar
+    Left = 471
+    Top = 330
+    Width = 169
+    Height = 24
+    Max = 255
+    PageSize = 25
+    Position = 255
+    PositionToolTip = ptTop
+    TabOrder = 1
+    TickStyle = tsNone
+    OnChange = TrackBarChange
   end
-  object SavePictureDialog: TSavePictureDialog
-    DefaultExt = '.bmp'
-    Filter = 'Portable Network Graphics (*.png)|*.png|Bitmaps (*.bmp)|*.bmp'
-    Left = 144
-    Top = 8
+  object TextTrackBar: TTrackBar
+    Left = 471
+    Top = 264
+    Width = 169
+    Height = 24
+    Max = 255
+    PageSize = 25
+    Position = 255
+    PositionToolTip = ptTop
+    TabOrder = 2
+    TickStyle = tsNone
+    OnChange = TrackBarChange
   end
 end
