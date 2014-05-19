@@ -30,6 +30,7 @@ type
   private
     GlassCanvas : TTransparentCanvas;
     procedure DrawFormCanvas;
+    procedure LoadAndDrawMetafile(Canvas : TTransparentCanvas);
   public
 
   end;
@@ -81,6 +82,23 @@ begin
     GlassCanvas.GlowTextOut(516, 13, 4, 'Half-transparent text!', 128);
   end;
   GlassCanvas.DrawToGlass(0, 0, Canvas.Handle);
+end;
+
+procedure TfrmDemo.LoadAndDrawMetafile(Canvas : TTransparentCanvas);
+var
+  Metafile : TMetafile;
+  Path : string;
+begin
+  Path := ExtractFilePath(ParamStr(0)) + 'test.emf';
+  if not FileExists(Path) then Exit;
+
+  Metafile := TMetafile.Create;
+  try
+    Metafile.LoadFromFile(Path);
+    Canvas.Draw(20, 120, Metafile, Metafile.Width, Metafile.Height, 128);
+  finally
+    Metafile.Free;
+  end;
 end;
 
 procedure TfrmDemo.PaintBoxPaint(Sender: TObject);
@@ -140,6 +158,9 @@ begin
     TransCanvas.Pen.Width := 5;
     TransCanvas.Brush.Color := clBlue;
     TransCanvas.RoundRect(Rect(150, 150, 420, 300), 50, 50, AlphaTrackBar.Position);
+
+    // Load and draw the example metafile, if it exists
+    LoadAndDrawMetafile(TransCanvas);
 
     // Key part: draw to the normal (paintbox) TCanvas, blending the whole thing with a specific alpha
     TransCanvas.DrawTo(0, 0, PaintBox.Canvas, PaintBox.Width, PaintBox.Height, CompositionAlphaTrackBar.Position);

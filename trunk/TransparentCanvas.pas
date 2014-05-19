@@ -155,17 +155,19 @@ type
     constructor Create(ToCopy : TCustomTransparentCanvas); overload;
     destructor Destroy; override;
 
-    procedure Draw(X, Y: Integer; Canvas: TCanvas; Width, Height : Integer);
-    procedure DrawTo(X, Y : Integer; Canvas : TCanvas; TargetWidth, TargetHeight: Integer; Transparency : Byte = $FF); overload;
-    procedure DrawTo(X, Y: Integer; DC: HDC; TargetWidth, TargetHeight: Integer; Transparency : Byte = $FF); overload;
-    procedure DrawToGlass(X, Y : Integer; DC : HDC; Transparency : Byte = $FF);
+    procedure Draw(const X, Y: Integer; Canvas: TCanvas; const Width, Height : Integer); overload;
+    procedure Draw(const X, Y: Integer; const Metafile: TMetafile; const Width, Height : Integer; const Transparency : Byte = $FF); overload;
 
-    procedure MoveTo(X, Y: Integer);
+    procedure DrawTo(const X, Y : Integer; Canvas : TCanvas; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
+    procedure DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
+    procedure DrawToGlass(const X, Y : Integer; DC : HDC; const Transparency : Byte = $FF);
 
-    procedure RoundRect(X1, Y1, X2, Y2, XRadius, YRadius: Integer; Alpha : Byte = $FF); overload;
-    procedure RoundRect(Rect : TRect; XRadius, YRadius : Integer; Alpha : Byte = $FF); overload;
-    procedure Rectangle(X1, Y1, X2, Y2: Integer; Alpha : Byte = $FF); overload;
-    procedure Rectangle(Rect : TRect; Alpha : Byte = $FF); overload;
+    procedure MoveTo(const X, Y: Integer);
+
+    procedure RoundRect(const X1, Y1, X2, Y2, XRadius, YRadius: Integer; const Alpha : Byte = $FF); overload;
+    procedure RoundRect(const Rect : TRect; const XRadius, YRadius : Integer; const Alpha : Byte = $FF); overload;
+    procedure Rectangle(const X1, Y1, X2, Y2: Integer; const Alpha : Byte = $FF); overload;
+    procedure Rectangle(const Rect : TRect; const Alpha : Byte = $FF); overload;
 
     function TextExtent(const Text: string): TSize;
     function TextHeight(const Text: string): Integer;
@@ -301,21 +303,41 @@ begin
   inherited;
 end;
 
-procedure TCustomTransparentCanvas.Draw(X, Y: Integer; Canvas: TCanvas;
-  Width, Height : Integer);
+procedure TCustomTransparentCanvas.Draw(const X, Y: Integer; Canvas: TCanvas;
+  const Width, Height : Integer);
 begin
   BitBlt(FWorkingCanvas.FDCHandle, X, Y, Width, Height, Canvas.Handle, 0, 0, SRCCOPY);
   FWorkingCanvas.ProcessTransparency($FF, Rect(X, Y, X+Width, Y+Height));
 end;
 
-procedure TCustomTransparentCanvas.DrawTo(X, Y: Integer; Canvas: TCanvas; TargetWidth,
-  TargetHeight: Integer; Transparency : Byte = 255);
+procedure TCustomTransparentCanvas.Draw(const X, Y: Integer; const Metafile: TMetafile;
+  const Width, Height: Integer; const Transparency : Byte = $FF);
+var
+  TempImage : TAlphaBitmapWrapper;
+begin
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, Width, Height);
+  try
+    TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
+    try
+      PlayEnhMetaFile(TempImage.FDCHandle, Metafile.Handle, Rect(0, 0, Width, Height));
+      TempImage.ProcessTransparency(Transparency);
+      TempImage.BlendTo(X, Y, FWorkingCanvas);
+    finally
+      TempImage.SelectOriginalObjects;
+    end;
+  finally
+    TempImage.Free;
+  end;
+end;
+
+procedure TCustomTransparentCanvas.DrawTo(const X, Y: Integer; Canvas: TCanvas; const TargetWidth,
+  TargetHeight: Integer; const Transparency : Byte = 255);
 begin
   DrawTo(X, Y, Canvas.Handle, TargetWidth, TargetHeight, Transparency);
 end;
 
-procedure TCustomTransparentCanvas.DrawTo(X, Y: Integer; DC: HDC; TargetWidth,
-  TargetHeight: Integer; Transparency : Byte = 255);
+procedure TCustomTransparentCanvas.DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth,
+  TargetHeight: Integer; const Transparency : Byte = 255);
 var
   TempCanvas: TAlphaBitmapWrapper;
 begin
@@ -339,7 +361,7 @@ begin
   end;
 end;
 
-procedure TCustomTransparentCanvas.DrawToGlass(X, Y: Integer; DC: HDC; Transparency : Byte);
+procedure TCustomTransparentCanvas.DrawToGlass(const X, Y: Integer; DC: HDC; const Transparency : Byte);
 begin
   FWorkingCanvas.BlendToDC(X, Y, DC, Transparency);
 end;
@@ -453,7 +475,7 @@ begin
   end;
 end;
 
-procedure TCustomTransparentCanvas.MoveTo(X, Y: Integer);
+procedure TCustomTransparentCanvas.MoveTo(const X, Y: Integer);
 begin
   MoveToEx(FWorkingCanvas.FDCHandle, X, Y, nil);
 end;
@@ -478,7 +500,7 @@ begin
   Result := TColor(RGB(Color.Red, Color.Blue, Color.Green));
 end;
 
-procedure TCustomTransparentCanvas.Rectangle(X1, Y1, X2, Y2: Integer; Alpha: Byte);
+procedure TCustomTransparentCanvas.Rectangle(const X1, Y1, X2, Y2: Integer; const Alpha: Byte);
 var
   TempImage : TAlphaBitmapWrapper;
 begin
@@ -493,17 +515,17 @@ begin
   TempImage.Free;
 end;
 
-procedure TCustomTransparentCanvas.Rectangle(Rect: TRect; Alpha: Byte);
+procedure TCustomTransparentCanvas.Rectangle(const Rect: TRect; const Alpha: Byte);
 begin
   Rectangle(Rect.Left, Rect.Top, Rect.Right, Rect.Bottom, Alpha);
 end;
 
-procedure TCustomTransparentCanvas.RoundRect(Rect: TRect; XRadius, YRadius : Integer; Alpha : Byte = $FF);
+procedure TCustomTransparentCanvas.RoundRect(const Rect: TRect; const XRadius, YRadius : Integer; const Alpha : Byte = $FF);
 begin
   RoundRect(Rect.Left, Rect.Top, Rect.Right, Rect.Bottom, XRadius, YRadius, Alpha);
 end;
 
-procedure TCustomTransparentCanvas.RoundRect(X1, Y1, X2, Y2, XRadius, YRadius: Integer; Alpha : Byte = $FF);
+procedure TCustomTransparentCanvas.RoundRect(const X1, Y1, X2, Y2, XRadius, YRadius: Integer; const Alpha : Byte = $FF);
 var
   TempImage : TAlphaBitmapWrapper;
 begin
