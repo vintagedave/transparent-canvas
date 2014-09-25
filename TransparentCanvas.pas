@@ -164,6 +164,7 @@ type
     procedure Draw(const X, Y: Integer; Canvas: TCanvas; const Width, Height : Integer;
       const UseTransparentColor : Boolean = false; const TransparentColor : COLORREF = $0; const TransparentEdgeWidth : Integer = -1); overload;
     procedure Draw(const X, Y: Integer; const Metafile: TMetafile; const Width, Height : Integer; const Transparency : Byte = $FF); overload;
+    procedure Draw(const X, Y : Integer; Other : TCustomTransparentCanvas; const Transparency : Byte = 255); overload;
 
     procedure DrawTo(const X, Y : Integer; Canvas : TCanvas; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
     procedure DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
@@ -389,6 +390,12 @@ begin
   finally
     TempImage.Free;
   end;
+end;
+
+procedure TCustomTransparentCanvas.Draw(const X, Y : Integer; Other : TCustomTransparentCanvas;
+  const Transparency : Byte = 255);
+begin
+  Other.FWorkingCanvas.BlendTo(X, Y, FWorkingCanvas, Transparency);
 end;
 
 procedure TCustomTransparentCanvas.DrawTo(const X, Y: Integer; Canvas: TCanvas; const TargetWidth,
