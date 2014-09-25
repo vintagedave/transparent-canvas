@@ -93,6 +93,7 @@ type
     procedure ProcessTransparency(const Alpha: Byte); overload;
     procedure ProcessTransparency(const Alpha: Byte; TranspRect : TRect); overload;
     procedure ProcessMaskTransparency(var MaskImage: TAlphaBitmapWrapper);
+    procedure ProcessTransparentColor(const TransparentColor : COLORREF; const TransparentEdgeWidth : Integer = -1);
     procedure TintByAlphaToColor(const Color : TQuadColor);
     procedure BlendTo(X, Y: Integer; var Image: TAlphaBitmapWrapper; Transparency: Byte = $FF);
     procedure BlendToStretch(X, Y, StretchWidth, StretchHeight: Integer;
@@ -155,7 +156,13 @@ type
     constructor Create(ToCopy : TCustomTransparentCanvas); overload;
     destructor Destroy; override;
 
-    procedure Draw(const X, Y: Integer; Canvas: TCanvas; const Width, Height : Integer); overload;
+    procedure Assign(Source : TPersistent); override;
+    procedure AssignTo(Dest: TPersistent); override;
+
+    procedure SaveToFile(const Filename : string);
+
+    procedure Draw(const X, Y: Integer; Canvas: TCanvas; const Width, Height : Integer;
+      const UseTransparentColor : Boolean = false; const TransparentColor : COLORREF = $0; const TransparentEdgeWidth : Integer = -1); overload;
     procedure Draw(const X, Y: Integer; const Metafile: TMetafile; const Width, Height : Integer; const Transparency : Byte = $FF); overload;
 
     procedure DrawTo(const X, Y : Integer; Canvas : TCanvas; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
@@ -209,7 +216,7 @@ type
 implementation
 
 uses
-  Math, Themes, UxTheme;
+  Math, Themes, UxTheme, RTLConsts;
 
 {$if CompilerVersion >= 23.0} // XE2
   function InternalStyleServices : TCustomStyleServices;
@@ -303,11 +310,65 @@ begin
   inherited;
 end;
 
-procedure TCustomTransparentCanvas.Draw(const X, Y: Integer; Canvas: TCanvas;
-  const Width, Height : Integer);
+procedure TCustomTransparentCanvas.Assign(Source : TPersistent);
+var
+  ToCopy : TCustomTransparentCanvas;
 begin
-  BitBlt(FWorkingCanvas.FDCHandle, X, Y, Width, Height, Canvas.Handle, 0, 0, SRCCOPY);
-  FWorkingCanvas.ProcessTransparency($FF, Rect(X, Y, X+Width, Y+Height));
+  if Source is TCustomTransparentCanvas then begin
+    ToCopy := Source as TCustomTransparentCanvas;
+
+    FWorkingCanvas.Free;
+    FWorkingCanvas := TAlphaBitmapWrapper.Create(ToCopy.FWorkingCanvas);
+    assert(Assigned(FFont) and Assigned(FBrush) and Assigned(FPen));
+    FFont.Assign(ToCopy.FFont);
+    FBrush.Assign(ToCopy.FBrush);
+    FPen.Assign(ToCopy.FPen);
+    FAttachedDC := 0;
+  end else begin
+    if Assigned(Source) then
+      raise EConvertError.CreateResFmt(@RTLConsts.SAssignError, [Source.ClassName, ClassName])
+    else
+      raise EConvertError.CreateResFmt(@RTLConsts.SAssignError, ['nil', ClassName]);
+  end;
+end;
+
+procedure TCustomTransparentCanvas.AssignTo(Dest: TPersistent);
+begin
+  Dest.Assign(Self);
+end;
+
+procedure TCustomTransparentCanvas.SaveToFile(const Filename : string);
+var
+  BMP : TBitmap;
+begin
+  // Draw to a transparent 32-bit bitmap, and save that
+  BMP := TBitmap.Create;
+  try
+    BMP.PixelFormat := pf32bit;
+    BMP.Width := Width;
+    BMP.Height := Height;
+    DrawTo(0, 0, BMP.Canvas, Width, Height);
+    BMP.SaveToFile(Filename);
+  finally
+    BMP.Free;
+  end;
+end;
+
+procedure TCustomTransparentCanvas.Draw(const X, Y: Integer; Canvas: TCanvas; const Width, Height : Integer;
+  const UseTransparentColor : Boolean; const TransparentColor : COLORREF; const TransparentEdgeWidth : Integer);
+var
+  TempImage : TAlphaBitmapWrapper;
+begin
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, Width, Height);
+  try
+    BitBlt(TempImage.FDCHandle, 0, 0, Width, Height, Canvas.Handle, 0, 0, SRCCOPY);
+    TempImage.ProcessTransparency($FF);
+    if UseTransparentColor then
+      TempImage.ProcessTransparentColor(TransparentColor, TransparentEdgeWidth);
+    TempImage.BlendTo(X, Y, FWorkingCanvas);
+  finally
+    TempImage.Free;
+  end;
 end;
 
 procedure TCustomTransparentCanvas.Draw(const X, Y: Integer; const Metafile: TMetafile;
@@ -881,6 +942,38 @@ begin
     end;
     Inc(PQuad);
     Inc(PmaskQuad);
+  end;
+end;
+
+procedure TAlphaBitmapWrapper.ProcessTransparentColor(const TransparentColor : COLORREF; const TransparentEdgeWidth : Integer);
+  function IsEdge(const PixelIndex : Integer) : Boolean;
+  var
+    X, Y : Integer;
+  begin
+    if TransparentEdgeWidth < 0 then Exit(true); // Entire image should be processed
+    // index = (Y * width) + X (note Y is inverse)
+    Y := PixelIndex div FWidth;
+    X := PixelIndex - (Y * FWidth);
+    Result := (X < TransparentEdgeWidth) or (Y < TransparentEdgeWidth) or
+      (X > (FWidth - TransparentEdgeWidth - 1)) or (Y > (FHeight - TransparentEdgeWidth - 1));
+  end;
+var
+  Loop : Integer;
+  PQuad : PQuadColor;
+  R, G, B : Byte;
+begin
+  if TransparentEdgeWidth = 0 then Exit; // Want to process an edge, but no edge width (pass -1 for whole image)
+
+  GdiFlush; // Need to flush before any manipulation of bits
+  R := GetRValue(TransparentColor);
+  G := GetGValue(TransparentColor);
+  B := GetBValue(TransparentColor);
+  PQuad := FQuads;
+  for Loop := 0 to FWidth * FHeight - 1 do begin
+    if (PQuad.Red = R) and (PQuad.Green = G) and (PQuad.Blue = B) and IsEdge(Loop) then begin
+      PQuad.SetAlpha(0, 1);
+    end;
+    Inc(PQuad);
   end;
 end;
 
