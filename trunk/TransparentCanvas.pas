@@ -363,7 +363,7 @@ begin
   TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, Width, Height);
   try
     BitBlt(TempImage.FDCHandle, 0, 0, Width, Height, Canvas.Handle, 0, 0, SRCCOPY);
-    TempImage.ProcessTransparency($FF);
+    TempImage.SetAllTransparency($FF); // No need to test, all written by GDI
     if UseTransparentColor then
       TempImage.ProcessTransparentColor(TransparentColor, TransparentEdgeWidth);
     TempImage.BlendTo(X, Y, FWorkingCanvas);
@@ -804,7 +804,7 @@ begin
   with BlendFunc do begin
     BlendOp := AC_SRC_OVER;
     BlendFlags := 0;
-    SourceConstantAlpha := 255;
+    SourceConstantAlpha := Transparency;
     AlphaFormat := AC_SRC_ALPHA;
   end;
   AlphaBlend(DC, X, Y, FWidth, FHeight, FDcHandle, 0, 0, FWidth, FHeight, BlendFunc);
