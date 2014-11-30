@@ -79,7 +79,7 @@ begin
     GlassCanvas.Font.Style := [fsBold, fsItalic];
     GlassCanvas.GlowTextOut(390, 13, 4, 'Random shapes!');
     GlassCanvas.Font.Style := [fsItalic];
-    GlassCanvas.GlowTextOut(516, 13, 4, 'Half-transparent text!', 128);
+    GlassCanvas.GlowTextOut(516, 13, 4, 'Half-transparent text!', taLeftJustify, 128);
   end;
   GlassCanvas.DrawToGlass(0, 0, Canvas.Handle);
 end;
@@ -139,7 +139,7 @@ begin
     // Draw a transparent roundrect that big plus a border
     TransCanvas.RoundRect(Rect(TextX, TextY, TextX + TextSize.cx + TextBorder*2, TextY + TextSize.cy + TextBorder*2),
       TextRadius, TextRadius, AlphaTrackBar.Position);
-    TransCanvas.TextOut(TextX + TextBorder, TextX + TextBorder, Text, TextTrackBar.Position);
+    TransCanvas.TextOut(TextX + TextBorder, TextX + TextBorder, Text, taLeftJustify, TextTrackBar.Position);
 
     // Clipped text
     //TransCanvas.TextRect(Rect(5, 5, 150, 15), 'Test clipped text in a rectangle', TextTrackBar.Position);
@@ -147,8 +147,8 @@ begin
     // Draw glowing text (Vista+ text with a hazy background) if possible
     TransCanvas.Font.Color := clBlack;
     if TransCanvas.CanDrawGlowText then begin
-      TransCanvas.GlowTextOut(60, 50, 4, 'Test glowing text', TextTrackBar.Position);
-      TransCanvas.GlowTextOutBackColor(60, 75, 4, 'Test glowing text with background color', clLime, AlphaTrackBar.Position, TextTrackBar.Position);
+      TransCanvas.GlowTextOut(60, 50, 4, 'Test glowing text', taLeftJustify, TextTrackBar.Position);
+      TransCanvas.GlowTextOutBackColor(60, 75, 4, 'Test glowing text with background color', clLime, taLeftJustify, AlphaTrackBar.Position, TextTrackBar.Position);
     end;
 
     // Draw some rectangles and rounded rectangles
@@ -158,6 +158,7 @@ begin
     TransCanvas.Pen.Width := 5;
     TransCanvas.Brush.Color := clBlue;
     TransCanvas.RoundRect(Rect(150, 150, 420, 300), 50, 50, AlphaTrackBar.Position);
+    TransCanvas.Ellipse(150, 150, 420, 300, AlphaTrackBar.Position);
 
     // Load and draw the example metafile, if it exists
     LoadAndDrawMetafile(TransCanvas);
