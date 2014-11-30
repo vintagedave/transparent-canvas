@@ -18,6 +18,7 @@ unit TransparentCanvas;
   All Rights Reserved.
 
   Contributor(s): David Millington.
+                  Frank Staal
 }
 
 interface
@@ -162,13 +163,17 @@ type
     procedure SaveToFile(const Filename : string);
 
     procedure Draw(const X, Y: Integer; Canvas: TCanvas; const Width, Height : Integer;
-      const UseTransparentColor : Boolean = false; const TransparentColor : COLORREF = $0; const TransparentEdgeWidth : Integer = -1); overload;
+      const UseTransparentColor : Boolean = false; const TransparentColor : COLORREF = $0; const TransparentEdgeWidth :
+      Integer = -1); overload;
     procedure Draw(const X, Y: Integer; const Metafile: TMetafile; const Width, Height : Integer; const Transparency : Byte = $FF); overload;
     procedure Draw(const X, Y : Integer; Other : TCustomTransparentCanvas; const Transparency : Byte = 255); overload;
 
     procedure DrawTo(const X, Y : Integer; Canvas : TCanvas; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
     procedure DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
     procedure DrawToGlass(const X, Y : Integer; DC : HDC; const Transparency : Byte = $FF);
+
+    procedure Ellipse(const X1, Y1, X2, Y2: Integer; const Alpha : Byte = $FF); overload;
+    procedure Ellipse(const Rect : TRect; const Alpha : Byte = $FF); overload;
 
     procedure MoveTo(const X, Y: Integer);
 
@@ -434,6 +439,29 @@ begin
   FWorkingCanvas.BlendToDC(X, Y, DC, Transparency);
 end;
 
+procedure TCustomTransparentCanvas.Ellipse(const X1, Y1, X2, Y2: Integer; const Alpha: Byte);
+var
+  TempImage : TAlphaBitmapWrapper;
+begin
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2-X1, Y2-Y1);
+  try
+    TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
+    SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
+    Windows.Ellipse(TempImage.FDCHandle, X1, Y1, X2, Y2);
+    SetWindowOrgEx(TempImage.FDCHandle, 0, 0, nil);
+    TempImage.ProcessTransparency(Alpha);
+    TempImage.BlendTo(X1, Y1, FWorkingCanvas);
+    TempImage.SelectOriginalObjects;
+  finally
+    TempImage.Free;
+  end;
+end;
+
+procedure TCustomTransparentCanvas.Ellipse(const Rect: TRect; const Alpha: Byte);
+begin
+  Ellipse(Rect.Left, Rect.Top, Rect.Right, Rect.Bottom, Alpha);
+end;
+
 function TCustomTransparentCanvas.GetHandle: HDC;
 begin
   Result := FWorkingCanvas.FDCHandle;
@@ -531,7 +559,8 @@ procedure TCustomTransparentCanvas.GlowTextOutBackColor(const X, Y, GlowSize: In
 var
   Background : TQuadColor;
 begin
-  if (COLORREF(ColorToRGB(BackColor)) = RGB(255, 255, 255)) and (GlowAlpha = 255) then begin // White is the default on Windows; do no special processing
+  if (COLORREF(ColorToRGB(BackColor)) = RGB(255, 255, 255)) and (GlowAlpha = 255) then begin // White is the default on
+  //Windows; do no special processing
     GlowTextOut(X, Y, GlowSize, Text, Alpha);
   end else begin
     // Windows draws glowing text with a white background, always.  To change the background colour,
@@ -573,14 +602,17 @@ var
   TempImage : TAlphaBitmapWrapper;
 begin
   TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2-X1, Y2-Y1);
-  TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
-  SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
-  Windows.Rectangle(TempImage.FDCHandle, X1, Y1, X2, Y2);
-  SetWindowOrgEx(TempImage.FDCHandle, 0, 0, nil);
-  TempImage.ProcessTransparency(Alpha);
-  TempImage.BlendTo(X1 + Pen.Width div 2, Y1 + Pen.Width div 2, FWorkingCanvas);
-  TempImage.SelectOriginalObjects;
-  TempImage.Free;
+  try
+    TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
+    SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
+    Windows.Rectangle(TempImage.FDCHandle, X1, Y1, X2, Y2);
+    SetWindowOrgEx(TempImage.FDCHandle, 0, 0, nil);
+    TempImage.ProcessTransparency(Alpha);
+    TempImage.BlendTo(X1, Y1, FWorkingCanvas);
+    TempImage.SelectOriginalObjects;
+  finally
+    TempImage.Free;
+  end;
 end;
 
 procedure TCustomTransparentCanvas.Rectangle(const Rect: TRect; const Alpha: Byte);
@@ -598,14 +630,17 @@ var
   TempImage : TAlphaBitmapWrapper;
 begin
   TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2-X1 + Pen.Width, Y2-Y1 + Pen.Width);
-  TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
-  SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
-  Windows.RoundRect(TempImage.FDCHandle, X1, Y1, X2, Y2, XRadius, YRadius);
-  SetWindowOrgEx(TempImage.FDCHandle, 0, 0, nil);
-  TempImage.ProcessTransparency(Alpha);
-  TempImage.BlendTo(X1 - Pen.Width div 2, Y1 - Pen.Width div 2, FWorkingCanvas);
-  TempImage.SelectOriginalObjects;
-  TempImage.Free;
+  try
+    TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
+    SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
+    Windows.RoundRect(TempImage.FDCHandle, X1, Y1, X2, Y2, XRadius, YRadius);
+    SetWindowOrgEx(TempImage.FDCHandle, 0, 0, nil);
+    TempImage.ProcessTransparency(Alpha);
+    TempImage.BlendTo(X1, Y1, FWorkingCanvas);
+    TempImage.SelectOriginalObjects;
+  finally
+    TempImage.Free;
+  end;
 end;
 
 procedure TCustomTransparentCanvas.SetBrush(NewBrush: TBrush);
@@ -700,8 +735,7 @@ begin
     TextOutPreVista(Rect(X, Y, X + TextSize.cx, Y + TextSize.cy), Text, Alpha);
 end;
 
-procedure TCustomTransparentCanvas.TextOutPreVista(const Rect : TRect; const Text: string;
-  const Alpha: Byte);
+procedure TCustomTransparentCanvas.TextOutPreVista(const Rect: TRect; const Text: string; const Alpha: Byte);
 var
   TempImage : TAlphaBitmapWrapper;
   FontHandle : HFONT;
@@ -728,8 +762,7 @@ begin
   end;
 end;
 
-procedure TCustomTransparentCanvas.TextOutVistaPlus(const ARect : TRect; const Text: string;
-  const Alpha: Byte);
+procedure TCustomTransparentCanvas.TextOutVistaPlus(const ARect: TRect; const Text: string; const Alpha: Byte);
 var
   TempImage : TAlphaBitmapWrapper;
   TextSize : TSize;
@@ -769,7 +802,7 @@ begin
   end;
 end;
 
-procedure TCustomTransparentCanvas.TextRect(const Rect : TRect; const Text: string; const Alpha: Byte);
+procedure TCustomTransparentCanvas.TextRect(const Rect: TRect; const Text: string; const Alpha: Byte = $FF);
 begin
   if CanUseDrawThemeTextEx then
     TextOutVistaPlus(Rect, Text, Alpha)
