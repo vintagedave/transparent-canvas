@@ -141,11 +141,15 @@ type
     function GetRawPixel(X, Y : Integer) : TQuadColor;
     procedure SetRawPixel(X, Y : Integer; Color : TQuadColor);
 
-    procedure TextOutPreVista(const Rect : TRect; const Text: string; const Alpha : Byte);
-    procedure TextOutVistaPlus(const ARect : TRect; const Text: string; const Alpha : Byte);
+    procedure TextOutPreVista(const Rect : TRect; const Text: string; const Alignment : TAlignment; const Alpha : Byte);
+    procedure TextOutVistaPlus(const ARect : TRect; const Text: string; const Alignment : TAlignment; const Alpha : Byte);
     function CanUseDrawThemeTextEx : boolean;
     procedure InternalGlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
-      const Alpha: Byte; const ProcessBackColor : Boolean; const BackColor : TQuadColor);
+      const Alignment : TAlignment; const Alpha: Byte; const ProcessBackColor : Boolean;
+      const BackColor : TQuadColor); overload;
+    procedure InternalGlowTextOut(const ARect : TRect; const GlowSize: Integer; const Text: string;
+      const Alignment : TAlignment; const Alpha: Byte; const ProcessBackColor : Boolean;
+      const BackColor : TQuadColor); overload;
   protected
     FWorkingCanvas : TAlphaBitmapWrapper;
 
@@ -184,14 +188,15 @@ type
 
     function TextExtent(const Text: string): TSize;
     function TextHeight(const Text: string): Integer;
-    procedure TextOut(const X, Y: Integer; const Text: string; const Alpha : Byte = $FF);
-    procedure TextRect(const Rect: TRect; const Text: string; const Alpha : Byte = $FF);
+    procedure TextOut(const X, Y: Integer; const Text: string; const Alignment : TAlignment = taLeftJustify; const Alpha : Byte = $FF);
+    procedure TextRect(const Rect: TRect; const Text: string; const Alignment : TAlignment = taLeftJustify; const Alpha : Byte = $FF);
     function TextWidth(const Text: string): Integer;
 
     function CanDrawGlowText : boolean;
-    procedure GlowTextOut(const X, Y, GlowSize: Integer; const Text: string; const Alpha : Byte = $FF);
+    procedure GlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
+      const Alignment : TAlignment = taLeftJustify; const Alpha : Byte = $FF);
     procedure GlowTextOutBackColor(const X, Y, GlowSize: Integer; const Text: string; const BackColor : TColor;
-      const GlowAlpha : Byte = $FF; const Alpha : Byte = $FF);
+      const Alignment : TAlignment = taLeftJustify; const GlowAlpha : Byte = $FF; const Alpha : Byte = $FF);
 
     procedure Clear;
 
@@ -239,6 +244,16 @@ uses
     Result := ThemeServices;
   end;
 {$ifend}
+
+function AlignmentToFlags(const Alignment : TAlignment) : DWORD;
+begin
+  Result := 0;
+  case Alignment of
+    taLeftJustify: Result := DT_LEFT;
+    taRightJustify: Result := DT_RIGHT;
+    taCenter: Result := DT_CENTER;
+  end;
+end;
 
 { TCustomTransparentCanvas }
 
@@ -499,18 +514,30 @@ begin
 end;
 
 procedure TCustomTransparentCanvas.InternalGlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
-  const Alpha: Byte; const ProcessBackColor : Boolean; const BackColor : TQuadColor);
+  const Alignment : TAlignment; const Alpha: Byte; const ProcessBackColor : Boolean; const BackColor : TQuadColor);
+var
+  TextSize : TSize;
+begin
+  TextSize := TextExtent(Text);
+  InternalGlowTextOut(Rect(X, Y, X + TextSize.cx, Y + TextSize.cy), GlowSize, Text, Alignment, Alpha, ProcessBackColor, BackColor);
+end;
+
+procedure TCustomTransparentCanvas.InternalGlowTextOut(const ARect : TRect; const GlowSize: Integer; const Text: string;
+  const Alignment : TAlignment; const Alpha: Byte; const ProcessBackColor : Boolean;
+  const BackColor : TQuadColor);
 var
   TempImage : TAlphaBitmapWrapper;
   TextSize : TSize;
   Options : TDTTOpts;
   Details: TThemedElementDetails;
   TextRect : TRect;
+  AlignFlags : DWORD;
 begin
   if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
   if not CanDrawGlowText then raise ETransparentCanvasException.Create('Cannot use DrawThemeTextEx');
 
-  TextSize := TextExtent(Text);
+  TextSize := ARect.Size;
+  AlignFlags := AlignmentToFlags(Alignment);
   TempImage := TAlphaBitmapWrapper.CreateForDrawThemeTextEx(FWorkingCanvas.FDCHandle, TextSize.cx + GlowSize*2, TextSize.cy + GlowSize*2);
   try
     TempImage.SelectObjects(TGDIObjects.CreateWithHandles(0, 0, Font.Handle));
@@ -526,7 +553,7 @@ begin
 		Details := InternalStyleServices.GetElementDetails(teEditTextNormal);
     TextRect := Rect(GlowSize, GlowSize, TextSize.cx + GlowSize*2, TextSize.cy + GlowSize*2);
     DrawThemeTextEx(InternalStyleServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
-      PChar(Text), Length(Text), DT_LEFT or DT_TOP or DT_NOCLIP, TextRect,
+      PChar(Text), Length(Text), AlignFlags or DT_TOP or DT_NOCLIP, TextRect,
       Options);
 
     if ProcessBackColor then begin
@@ -537,11 +564,15 @@ begin
       Options.crText := ColorToRGB(Font.Color);
       Options.iGlowSize := 0;
       DrawThemeTextEx(InternalStyleServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
-        PChar(Text), Length(Text), DT_LEFT or DT_TOP or DT_NOCLIP, TextRect,
+        PChar(Text), Length(Text), AlignFlags or DT_TOP or DT_NOCLIP, TextRect,
         Options);
     end;
 
-    TempImage.BlendTo(X - GlowSize, Y - GlowSize, FWorkingCanvas, Alpha);
+    case Alignment of
+      taLeftJustify: TempImage.BlendTo(ARect.Left - GlowSize, ARect.Top - GlowSize, FWorkingCanvas, Alpha);
+      taRightJustify: TempImage.BlendTo(ARect.Left - GlowSize * 2, ARect.Top - GlowSize, FWorkingCanvas, Alpha);
+      taCenter: TempImage.BlendTo(ARect.Left - GlowSize * 2 + 1 + IfThen(GlowSize > 0, 1, -1), ARect.Top - GlowSize, FWorkingCanvas, Alpha);
+    end;
     SetBkMode(TempImage.FDCHandle, OPAQUE);
     TempImage.SelectOriginalObjects;
   finally
@@ -550,26 +581,27 @@ begin
 end;
 
 procedure TCustomTransparentCanvas.GlowTextOut(const X, Y, GlowSize: Integer; const Text: string;
-  const Alpha: Byte);
+  const Alignment : TAlignment; const Alpha: Byte);
 begin
-  InternalGlowTextOut(X, Y, GlowSize, Text, Alpha, False, TQuadColor.Create(0));
+  InternalGlowTextOut(X, Y, GlowSize, Text, Alignment, Alpha, False, TQuadColor.Create(0));
 end;
 
 procedure TCustomTransparentCanvas.GlowTextOutBackColor(const X, Y, GlowSize: Integer;
-  const Text: string; const BackColor: TColor; const GlowAlpha : Byte; const Alpha: Byte);
+  const Text: string; const BackColor: TColor; const Alignment : TAlignment;
+  const GlowAlpha : Byte; const Alpha: Byte);
 var
   Background : TQuadColor;
 begin
   if (COLORREF(ColorToRGB(BackColor)) = RGB(255, 255, 255)) and (GlowAlpha = 255) then begin // White is the default on
   //Windows; do no special processing
-    GlowTextOut(X, Y, GlowSize, Text, Alpha);
+    GlowTextOut(X, Y, GlowSize, Text, Alignment, Alpha);
   end else begin
     // Windows draws glowing text with a white background, always.  To change the background colour,
     // draw with the normal white background and black text, then process the colours to change
     // white to the specified colour, and black to the font colour
     Background := TQuadColor.Create(BackColor);
     Background.SetAlpha(GlowAlpha, Alpha / 255.0);
-    InternalGlowTextOut(X, Y, GlowSize, Text, Alpha, True, Background);
+    InternalGlowTextOut(X, Y, GlowSize, Text, Alignment, Alpha, True, Background);
   end;
 end;
 
@@ -731,7 +763,8 @@ begin
   Result := TextExtent(Text).cy;
 end;
 
-procedure TCustomTransparentCanvas.TextOut(const X, Y: Integer; const Text: string; const Alpha : Byte);
+procedure TCustomTransparentCanvas.TextOut(const X, Y: Integer; const Text: string;
+  const Alignment : TAlignment; const Alpha : Byte);
 var
   TextSize : TSize;
 begin
@@ -739,16 +772,18 @@ begin
 
   TextSize := TextExtent(Text);
   if CanUseDrawThemeTextEx then
-    TextOutVistaPlus(Rect(X, Y, X + TextSize.cx, Y + TextSize.cy), Text, Alpha)
+    TextOutVistaPlus(Rect(X, Y, X + TextSize.cx, Y + TextSize.cy), Text, Alignment, Alpha)
   else
-    TextOutPreVista(Rect(X, Y, X + TextSize.cx, Y + TextSize.cy), Text, Alpha);
+    TextOutPreVista(Rect(X, Y, X + TextSize.cx, Y + TextSize.cy), Text, Alignment, Alpha);
 end;
 
-procedure TCustomTransparentCanvas.TextOutPreVista(const Rect: TRect; const Text: string; const Alpha: Byte);
+procedure TCustomTransparentCanvas.TextOutPreVista(const Rect: TRect; const Text: string;
+  const Alignment : TAlignment; const Alpha: Byte);
 var
   TempImage : TAlphaBitmapWrapper;
   FontHandle : HFONT;
   TextSize : TSize;
+  OldAlign : UINT;
 begin
   if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
 
@@ -762,7 +797,17 @@ begin
     TempImage.SelectObjects(TGDIObjects.CreateWithHandles(0, 0, FontHandle));
     SetBkMode(TempImage.FDCHandle, TRANSPARENT);
     SetTextColor(TempImage.FDCHandle, ColorToRGB(Font.Color));
-    ExtTextOut(TempImage.FDCHandle, 0, 0, ETO_CLIPPED, nil, PChar(Text), Length(Text), nil);
+    OldAlign := GetTextAlign(TempImage.FDCHandle);
+    try
+      case Alignment of
+        taLeftJustify: SetTextAlign(TempImage.FDCHandle, TA_LEFT);
+        taRightJustify: SetTextAlign(TempImage.FDCHandle, TA_RIGHT);
+        taCenter: SetTextAlign(TempImage.FDCHandle, TA_CENTER);
+      end;
+      ExtTextOut(TempImage.FDCHandle, 0, 0, ETO_CLIPPED, nil, PChar(Text), Length(Text), nil);
+    finally
+      SetTextAlign(TempImage.FDCHandle, OldAlign);
+    end;
     SetBkMode(TempImage.FDCHandle, OPAQUE);
     TempImage.ProcessTransparency(Alpha);
     TempImage.BlendTo(Rect.Left, Rect.Top, FWorkingCanvas);
@@ -773,18 +818,21 @@ begin
   end;
 end;
 
-procedure TCustomTransparentCanvas.TextOutVistaPlus(const ARect: TRect; const Text: string; const Alpha: Byte);
+procedure TCustomTransparentCanvas.TextOutVistaPlus(const ARect: TRect; const Text: string;
+  const Alignment : TAlignment; const Alpha: Byte);
 var
   TempImage : TAlphaBitmapWrapper;
   TextSize : TSize;
   Options : TDTTOpts;
   Details: TThemedElementDetails;
   TextRect : TRect;
+  AlignFlags : DWORD;
 begin
   if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
   if not CanUseDrawThemeTextEx then raise ETransparentCanvasException.Create('Cannot use DrawThemeTextEx');
 
-  TextSize := TextExtent(Text);
+  AlignFlags := AlignmentToFlags(Alignment);
+  TextSize := ARect.Size; //TextExtent(Text);
   // Clip by clipping the size of the rectangle it assumes the text fits in
   TextSize.cx := min(TextSize.cx, ARect.Right-ARect.Left);
   TextSize.cy := min(TextSize.cy, ARect.Bottom-ARect.Top);
@@ -803,7 +851,7 @@ begin
 		Details := InternalStyleServices.GetElementDetails(teEditTextNormal);
     TextRect := Rect(0, 0, TextSize.cx, TextSize.cy);
     DrawThemeTextEx(InternalStyleServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
-      PChar(Text), Length(Text), DT_LEFT or DT_TOP, TextRect,
+      PChar(Text), Length(Text), AlignFlags or DT_TOP, TextRect,
       Options);
 
     SetBkMode(TempImage.FDCHandle, OPAQUE);
@@ -814,14 +862,14 @@ begin
   end;
 end;
 
-procedure TCustomTransparentCanvas.TextRect(const Rect: TRect; const Text: string; const Alpha: Byte = $FF);
+procedure TCustomTransparentCanvas.TextRect(const Rect: TRect; const Text: string; const Alignment : TAlignment; const Alpha: Byte);
 begin
   if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
 
   if CanUseDrawThemeTextEx then
-    TextOutVistaPlus(Rect, Text, Alpha)
+    TextOutVistaPlus(Rect, Text, Alignment, Alpha)
   else
-    TextOutPreVista(Rect, Text, Alpha);
+    TextOutPreVista(Rect, Text, Alignment, Alpha);
 end;
 
 function TCustomTransparentCanvas.TextWidth(const Text: string): Integer;
