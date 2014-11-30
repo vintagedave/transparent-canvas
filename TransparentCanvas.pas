@@ -507,6 +507,7 @@ var
   Details: TThemedElementDetails;
   TextRect : TRect;
 begin
+  if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
   if not CanDrawGlowText then raise ETransparentCanvasException.Create('Cannot use DrawThemeTextEx');
 
   TextSize := TextExtent(Text);
@@ -701,6 +702,12 @@ var
   OldFontHandle,
   FontHandle : HFONT;
 begin
+  if Length(Text) = 0 then begin
+    Result.cx := 0;
+    Result.cy := 0;
+    Exit;
+  end;
+
   if CanUseDrawThemeTextEx then begin // Can use DrawThemeTextEx; just get text extent normally
     FWorkingCanvas.SelectObjects(TGDIObjects.CreateWithHandles(0, 0, Font.Handle));
     GetTextExtentPoint32(FWorkingCanvas.FDCHandle, PChar(Text), Length(Text), Result);
@@ -728,6 +735,8 @@ procedure TCustomTransparentCanvas.TextOut(const X, Y: Integer; const Text: stri
 var
   TextSize : TSize;
 begin
+  if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
+
   TextSize := TextExtent(Text);
   if CanUseDrawThemeTextEx then
     TextOutVistaPlus(Rect(X, Y, X + TextSize.cx, Y + TextSize.cy), Text, Alpha)
@@ -741,6 +750,8 @@ var
   FontHandle : HFONT;
   TextSize : TSize;
 begin
+  if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
+
   TextSize := TextExtent(Text);
   // Clip to the rest by restricting the size it thinks the text is - the bitmap will be this size, thus clipped
   TextSize.cx := min(TextSize.cx, Rect.Right-Rect.Left);
@@ -770,6 +781,7 @@ var
   Details: TThemedElementDetails;
   TextRect : TRect;
 begin
+  if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
   if not CanUseDrawThemeTextEx then raise ETransparentCanvasException.Create('Cannot use DrawThemeTextEx');
 
   TextSize := TextExtent(Text);
@@ -804,6 +816,8 @@ end;
 
 procedure TCustomTransparentCanvas.TextRect(const Rect: TRect; const Text: string; const Alpha: Byte = $FF);
 begin
+  if Length(Text) = 0 then Exit; // Crash creating zero-sized bitmap
+
   if CanUseDrawThemeTextEx then
     TextOutVistaPlus(Rect, Text, Alpha)
   else
