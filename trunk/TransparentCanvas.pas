@@ -1073,7 +1073,7 @@ begin
   PQuad := FQuads;
   for Loop := 0 to FWidth * FHeight - 1 do begin
     if (PQuad.Red = R) and (PQuad.Green = G) and (PQuad.Blue = B) and IsEdge(Loop) then begin
-      PQuad.SetAlpha(0, 1);
+      PQuad.SetAlpha(0, 0); // 32-bit OSes must have all channels 0 (premultiplied) for 0 alpha
     end;
     Inc(PQuad);
   end;
