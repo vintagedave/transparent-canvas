@@ -131,6 +131,7 @@ type
 
     function GetWidth : Integer;
     function GetHeight : Integer;
+    function GetClipRect: TRect;
 
     // Converts to non-premultiplied alpha
     function GetPixel(X, Y : Integer) : COLORREF;
@@ -152,11 +153,12 @@ type
       const BackColor : TQuadColor); overload;
   protected
     FWorkingCanvas : TAlphaBitmapWrapper;
+    FPenPos: TPoint;
 
     function OrphanAliasedFont : HFONT;
   public
     constructor Create(Width, Height : Integer); overload;
-    constructor Create(Canvas: TCanvas); overload;
+    constructor Create(Canvas: TCanvas; Width, Height : Integer); overload;
     constructor Create(DC : HDC; Width, Height : Integer); overload;
     constructor Create(ToCopy : TCustomTransparentCanvas); overload;
     destructor Destroy; override;
@@ -170,17 +172,29 @@ type
       const UseTransparentColor : Boolean = false; const TransparentColor : COLORREF = $0; const TransparentEdgeWidth :
       Integer = -1); overload;
     procedure Draw(const X, Y: Integer; const Metafile: TMetafile; const Width, Height : Integer; const Transparency : Byte = $FF); overload;
-    procedure Draw(const X, Y : Integer; Other : TCustomTransparentCanvas; const Transparency : Byte = 255); overload;
+    procedure Draw(const X, Y: Integer; Other: TCustomTransparentCanvas; const Transparency: Byte = 255); overload;
+    procedure Draw(const X, Y: Integer; BitMap: TBitmap; const UseTransparentColor: Boolean = False; const TransparentColor: COLORREF = $0; const TransparentEdgeWidth: Integer = -1); overload;
+    procedure Draw(const X, Y, Index: Integer; ImageList: TImageList; const UseTransparentColor: Boolean = False; const TransparentColor: COLORREF = $0; const TransparentEdgeWidth: Integer = -1); overload;
 
-    procedure DrawTo(const X, Y : Integer; Canvas : TCanvas; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
-    procedure DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth, TargetHeight: Integer; const Transparency : Byte = $FF); overload;
+    procedure DrawTo(const X, Y : Integer; Canvas : TCanvas; const TargetWidth, TargetHeight: Integer; Invert : Boolean = False; const Transparency : Byte = $FF); overload;
+    procedure DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth, TargetHeight: Integer; Invert: Boolean = False; const Transparency : Byte = $FF); overload;
     procedure DrawToGlass(const X, Y : Integer; DC : HDC; const Transparency : Byte = $FF);
 
     procedure Ellipse(const X1, Y1, X2, Y2: Integer; const Alpha : Byte = $FF); overload;
     procedure Ellipse(const Rect : TRect; const Alpha : Byte = $FF); overload;
 
     procedure MoveTo(const X, Y: Integer);
+    function OnCanvas(const Point : TPoint): Boolean; overload;
+    function OnCanvas(const X, Y : Integer): Boolean; overload;
 
+    // Alpha applied to Pen and Brush
+    procedure LineTo(const X, Y : Integer; const Alpha : Byte = $FF); overload;
+    procedure Line(const X1, Y1, X2, Y2 : Integer; const Alpha : Byte = $FF); overload;
+    procedure Line(const Point1, Point2 : TPoint; const Alpha : Byte = $FF); overload;
+    procedure Polygon(const Points : array of TPoint; const Alpha : Byte = $FF); overload;
+    procedure Polygon(const Points : array of TPoint; const Count : Integer; const Alpha : Byte = $FF); overload;
+    procedure Polyline(const Points : array of TPoint; const Alpha : Byte = $FF); overload;
+    procedure Polyline(const Points : array of TPoint; const Count : Integer; const Alpha : Byte = $FF); overload;
     procedure RoundRect(const X1, Y1, X2, Y2, XRadius, YRadius: Integer; const Alpha : Byte = $FF); overload;
     procedure RoundRect(const Rect : TRect; const XRadius, YRadius : Integer; const Alpha : Byte = $FF); overload;
     procedure Rectangle(const X1, Y1, X2, Y2: Integer; const Alpha : Byte = $FF); overload;
@@ -210,6 +224,7 @@ type
     property Pen: TPen read FPen write SetPen;
     property Width : Integer read GetWidth;
     property Height : Integer read GetHeight;
+    property ClipRect: TRect read GetClipRect;
   end;
 
   TTransparentCanvas = class(TCustomTransparentCanvas)
@@ -301,7 +316,7 @@ begin
   FAttachedDC := 0;
 end;
 
-constructor TCustomTransparentCanvas.Create(Canvas: TCanvas);
+constructor TCustomTransparentCanvas.Create(Canvas: TCanvas; Width, Height : Integer);
 begin
   inherited Create();
   FAttachedDC := Canvas.Handle;
@@ -418,14 +433,27 @@ begin
   Other.FWorkingCanvas.BlendTo(X, Y, FWorkingCanvas, Transparency);
 end;
 
-procedure TCustomTransparentCanvas.DrawTo(const X, Y: Integer; Canvas: TCanvas; const TargetWidth,
-  TargetHeight: Integer; const Transparency : Byte = 255);
+procedure TCustomTransparentCanvas.Draw(const X, Y: Integer; BitMap: TBitmap; const UseTransparentColor: Boolean; const TransparentColor: COLORREF; const TransparentEdgeWidth: Integer);
 begin
-  DrawTo(X, Y, Canvas.Handle, TargetWidth, TargetHeight, Transparency);
+  Draw(X, Y, BitMap.Canvas, BitMap.Width, BitMap.Height, UseTransparentColor, TransparentColor, TransparentEdgeWidth);
 end;
 
-procedure TCustomTransparentCanvas.DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth,
-  TargetHeight: Integer; const Transparency : Byte = 255);
+procedure TCustomTransparentCanvas.Draw(const X, Y, Index: Integer; ImageList: TImageList; const UseTransparentColor: Boolean; const TransparentColor: COLORREF; const TransparentEdgeWidth: Integer);
+var
+  BitMap: TBitmap;
+begin
+  BitMap := TBitmap.Create;
+  ImageList.GetBitmap(Index, BitMap);
+  Draw(X, Y, BitMap, UseTransparentColor, TransparentColor, TransparentEdgeWidth);
+end;
+
+procedure TCustomTransparentCanvas.DrawTo(const X, Y: Integer; Canvas: TCanvas; const TargetWidth, TargetHeight: Integer; Invert: Boolean = False; const Transparency: Byte = 255);
+begin
+  DrawTo(X, Y, Canvas.Handle, TargetWidth, TargetHeight, Invert, Transparency);
+end;
+
+// InvertMode doesn't support Transparency
+procedure TCustomTransparentCanvas.DrawTo(const X, Y: Integer; DC: HDC; const TargetWidth, TargetHeight: Integer; Invert: Boolean = False; const Transparency: Byte = 255);
 var
   TempCanvas: TAlphaBitmapWrapper;
 begin
@@ -435,10 +463,17 @@ begin
     BitBlt(TempCanvas.FDCHandle, 0, 0, TargetWidth, TargetHeight, DC, 0, 0, SRCCOPY);
     TempCanvas.SetAllTransparency($FF);
 
+    if Invert then
+    begin
+      BitBlt(TempCanvas.FDCHandle, 0, 0, TargetWidth, TargetHeight, FWorkingCanvas.FDCHandle, 0, 0, SRCINVERT);
+    end
     // Now blend the working image onto it at (X, Y), possibly stretched
-    if (TargetWidth = Width) and (TargetHeight = Height) then begin
+    else if (TargetWidth = Width) and (TargetHeight = Height) then
+    begin
       FWorkingCanvas.BlendTo(X, Y, TempCanvas, Transparency);
-    end else begin
+    end
+    else
+    begin
       FWorkingCanvas.BlendToStretch(X, Y, TargetWidth, TargetHeight, TempCanvas, Transparency);
     end;
 
@@ -458,7 +493,7 @@ procedure TCustomTransparentCanvas.Ellipse(const X1, Y1, X2, Y2: Integer; const 
 var
   TempImage : TAlphaBitmapWrapper;
 begin
-  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2-X1, Y2-Y1);
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2 - X1 + Pen.Width, Y2 - Y1 + Pen.Width);
   try
     TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
     SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
@@ -485,6 +520,11 @@ end;
 function TCustomTransparentCanvas.GetHeight: Integer;
 begin
   Result := FWorkingCanvas.FHeight;
+end;
+
+function TCustomTransparentCanvas.GetClipRect: TRect;
+begin
+  Result := TRect.Create(0, 0, Width, Height);
 end;
 
 function TCustomTransparentCanvas.GetPenPos: TPoint;
@@ -608,6 +648,18 @@ end;
 procedure TCustomTransparentCanvas.MoveTo(const X, Y: Integer);
 begin
   MoveToEx(FWorkingCanvas.FDCHandle, X, Y, nil);
+  FPenPos.X := X;
+  FPenPos.Y := Y;
+end;
+
+function TCustomTransparentCanvas.OnCanvas(const Point: TPoint): Boolean;
+begin
+  Result := OnCanvas(Point.X, Point.Y);
+end;
+
+function TCustomTransparentCanvas.OnCanvas(const X: Integer; const Y: Integer): Boolean;
+begin
+  Result := (0 <= X) and (X < Width) and (0 <= Y) and (Y < Height);
 end;
 
 function TCustomTransparentCanvas.OrphanAliasedFont: HFONT;
@@ -630,11 +682,290 @@ begin
   Result := TColor(RGB(Color.Red, Color.Blue, Color.Green));
 end;
 
+procedure TCustomTransparentCanvas.LineTo(const X, Y: Integer; const Alpha: Byte);
+begin
+  Line(FPenPos.X, FPenPos.Y, X, Y, Alpha);
+  MoveTo(X, Y);
+end;
+
+procedure TCustomTransparentCanvas.Line(const X1, Y1, X2, Y2: Integer; const Alpha: Byte);
+begin
+  Line(TPoint.Create(X1, Y1), TPoint.Create(X2, Y2), Alpha);
+end;
+
+procedure TCustomTransparentCanvas.Line(const Point1, Point2: TPoint; const Alpha: Byte);
+var
+  Points: array of TPoint;
+begin
+  SetLength(Points, 2);
+  Points[0] := Point1;
+  Points[1] := Point2;
+  Polyline(Points, 2, Alpha);
+end;
+
+procedure TCustomTransparentCanvas.Polygon(const Points: array of TPoint; const Alpha: Byte);
+begin
+  Polygon(Points, Length(Points), Alpha);
+end;
+
+procedure TCustomTransparentCanvas.Polygon(const Points: array of TPoint; const Count: Integer; const Alpha: Byte);
+  procedure CopyPolygon(var A: array of TPoint; B: array of TPoint; Count: Integer);
+  var
+    i: Integer;
+  begin
+    for i := 0 to Count - 1 do
+      A[i] := B[i];
+  end;
+
+  function ClipVerticalLine(var Polygon: array of TPoint; Count: Integer; var Output: array of TPoint; const X: Integer; OnLeft: Boolean): Integer;
+  var
+    i: Integer;
+    p0, p1, p2, temp: TPoint;
+    A: Double;
+  begin
+    Result := 0;
+    if Count <= 0 then
+      exit;
+    p0 := Polygon[0];
+    for i := 0 to Count - 1 do
+    begin
+      p1 := Polygon[i];
+      if i + 1 = Count then
+        p2 := p0
+      else
+        p2 := Polygon[i + 1];
+
+      if ((p1.X < X) xor OnLeft) and ((p2.X < X) xor OnLeft) then
+        continue;
+      if ((p1.X >= X) xor OnLeft) and ((p2.X >= X) xor OnLeft) then
+      begin
+        Output[Result] := p1;
+        Inc(Result);
+      end
+      else
+      begin // segment intersects with line
+        if (p1.X >= X) xor OnLeft then
+        begin
+          Output[Result] := p1;
+          Inc(Result);
+        end;
+        if p1.X > p2.X then
+        begin
+          temp := p1;
+          p1 := p2;
+          p2 := temp;
+        end;
+        A := (p2.Y - p1.Y + 0.0) / (p2.X - p1.X + 0.0);
+        Output[Result].X := X;
+        Output[Result].Y := Round((X - p1.X) * A) + p1.Y;
+        Inc(Result);
+      end;
+    end;
+    CopyPolygon(Polygon, Output, Result);
+  end;
+
+  function ClipHorizontalLine(var Polygon: array of TPoint; Count: Integer; var Output: array of TPoint; const Y: Integer; OnAbove: Boolean): Integer;
+  var
+    i: Integer;
+    p0, p1, p2, temp: TPoint;
+    A: Double;
+  begin
+    Result := 0;
+    if Count <= 0 then
+      exit;
+    p0 := Polygon[0];
+    for i := 0 to Count - 1 do
+    begin
+      p1 := Polygon[i];
+      if i + 1 = Count then
+        p2 := p0
+      else
+        p2 := Polygon[i + 1];
+
+      if ((p1.Y < Y) xor OnAbove) and ((p2.Y < Y) xor OnAbove) then
+        continue;
+      if ((p1.Y >= Y) xor OnAbove) and ((p2.Y >= Y) xor OnAbove) then
+      begin
+        Output[Result] := p1;
+        Inc(Result);
+      end
+      else
+      begin // segment intersects with line
+        if (p1.Y >= Y) xor OnAbove then
+        begin
+          Output[Result] := p1;
+          Inc(Result);
+        end;
+        if p1.X > p2.X then
+        begin
+          temp := p1;
+          p1 := p2;
+          p2 := temp;
+        end;
+
+        if p1.X = p2.X then
+        begin
+          Output[Result].X := p1.X;
+        end
+        else
+        begin
+          A := (p2.Y - p1.Y + 0.0) / (p2.X - p1.X + 0.0);
+          Output[Result].X := Round((Y - p1.Y) / A) + p1.X;
+        end;
+        Output[Result].Y := Y;
+        Inc(Result);
+      end;
+    end;
+    CopyPolygon(Polygon, Output, Result);
+  end;
+
+  function Clip(var Points: array of TPoint; Count: Integer; var temp: array of TPoint; const Left, Top, Right, Bottom: Integer): Integer;
+  begin
+    Result := Count;
+    Result := ClipVerticalLine(Points, Result, temp, Left, False);
+    Result := ClipVerticalLine(Points, Result, temp, Right, True);
+    Result := ClipHorizontalLine(Points, Result, temp, Top, False);
+    Result := ClipHorizontalLine(Points, Result, temp, Bottom, True);
+  end;
+
+var
+  temp, PointsCopy: array of TPoint;
+  Count2: Integer;
+begin
+  SetLength(temp, Count * 2);
+  // worst case twice as many points are in the clipped polygon
+  SetLength(PointsCopy, Count * 2);
+  CopyPolygon(PointsCopy, Points, Count);
+  Count2 := Clip(PointsCopy, Count, temp, 0, 0, Width, Height);
+  if Count2 = 0 then
+    exit;
+  SetLength(PointsCopy, Count2);
+  PrivatePolygon(PointsCopy, Count2, Alpha);
+end;
+
+procedure TCustomTransparentCanvas.PrivatePolygon(const Points: array of TPoint; const Count: Integer; const Alpha: Byte);
+var
+  TempImage: TAlphaBitmapWrapper;
+  minX, minY, maxX, maxY, TmpWidth, TmpHeight: Integer;
+  i: Integer;
+begin
+  minX := High(Integer);
+  minY := High(Integer);
+  maxX := Low(Integer);
+  maxY := Low(Integer);
+  for i := 0 to Count - 1 do
+  begin
+    maxX := Max(maxX, Points[i].X);
+    maxY := Max(maxY, Points[i].Y);
+    minX := Min(minX, Points[i].X);
+    minY := Min(minY, Points[i].Y);
+  end;
+  maxX := maxX + Pen.Width;
+  maxY := maxY + Pen.Width;
+
+  TmpWidth := Min(maxX - minX, Width);
+  TmpHeight := Min(maxY - minY, Height);
+
+  if (TmpWidth = 0) or (TmpHeight = 0) then
+    exit;
+
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, TmpWidth, TmpHeight);
+  try
+    TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
+    SetWindowOrgEx(TempImage.FDCHandle, minX - Pen.Width div 2, minY - Pen.Width div 2, nil);
+    Windows.Polygon(TempImage.FDCHandle, Points, Count);
+    SetWindowOrgEx(TempImage.FDCHandle, 0, 0, nil);
+    TempImage.ProcessTransparency(Alpha);
+    TempImage.BlendTo(minX, minY, FWorkingCanvas);
+    TempImage.SelectOriginalObjects;
+  finally
+    TempImage.Free;
+  end;
+end;
+
+procedure TCustomTransparentCanvas.Polyline(const Points: array of TPoint; const Alpha: Byte);
+begin
+  Polyline(Points, Length(Points), Alpha);
+end;
+
+procedure TCustomTransparentCanvas.Polyline(const Points: array of TPoint; const Count: Integer; const Alpha: Byte);
+  function InitBoundingRect: TRect;
+  begin
+    Result := TRect.Create(High(Integer), High(Integer), Low(Integer), Low(Integer));
+  end;
+  function UpdateBoundingRect(BoundingRect: TRect; Point: TPoint): TRect;
+  begin
+    BoundingRect.Left := Min(BoundingRect.Left, Point.X);
+    BoundingRect.Top := Min(BoundingRect.Top, Point.Y);
+    BoundingRect.Right := Max(BoundingRect.Right, Point.X);
+    BoundingRect.Bottom := Max(BoundingRect.Bottom, Point.Y);
+    Result := BoundingRect;
+  end;
+
+var
+  VisPoints: array of TPoint;
+  i, counter: Integer;
+  BoundingRect: TRect;
+begin
+  // filter/split the polyline to visible parts
+  SetLength(VisPoints, Count);
+
+  counter := 0;
+  BoundingRect := InitBoundingRect;
+  for i := 0 to Count - 1 do
+  begin
+    // do a look ahead otherwise partial edges aren't drawn
+    if OnCanvas(Points[i]) or (i + 1 < Count) and (OnCanvas(Points[i + 1])) then
+    begin
+      VisPoints[counter] := Points[i];
+      Inc(counter);
+      BoundingRect := UpdateBoundingRect(BoundingRect, Points[i]);
+    end
+    else
+    begin
+      if counter = 0 then
+        continue;
+      VisPoints[counter] := Points[i];
+      BoundingRect := UpdateBoundingRect(BoundingRect, Points[i]);
+      PrivatePolyline(VisPoints, counter + 1, BoundingRect, Alpha);
+      counter := 0;
+      BoundingRect := InitBoundingRect;
+    end;
+  end;
+  if counter <> 0 then
+    PrivatePolyline(VisPoints, counter, BoundingRect, Alpha);
+end;
+
+procedure TCustomTransparentCanvas.PrivatePolyline(const Points: array of TPoint; const Count: Integer; const BoundingRect: TRect; const Alpha: Byte);
+var
+  TempImage: TAlphaBitmapWrapper;
+  TmpWidth, TmpHeight: Integer;
+begin
+  TmpWidth := BoundingRect.Right - BoundingRect.Left + Pen.Width;
+  TmpHeight := BoundingRect.Bottom - BoundingRect.Top + Pen.Width;
+
+  if (TmpWidth = 0) or (TmpHeight = 0) then
+    exit;
+
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, TmpWidth, TmpHeight);
+  try
+    TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
+    SetWindowOrgEx(TempImage.FDCHandle, BoundingRect.Left - Pen.Width div 2, BoundingRect.Top - Pen.Width div 2, nil);
+    Windows.Polyline(TempImage.FDCHandle, Points, Count);
+    SetWindowOrgEx(TempImage.FDCHandle, 0, 0, nil);
+    TempImage.ProcessTransparency(Alpha);
+    TempImage.BlendTo(BoundingRect.Left, BoundingRect.Top, FWorkingCanvas);
+    TempImage.SelectOriginalObjects;
+  finally
+    TempImage.Free;
+  end;
+end;
+
 procedure TCustomTransparentCanvas.Rectangle(const X1, Y1, X2, Y2: Integer; const Alpha: Byte);
 var
   TempImage : TAlphaBitmapWrapper;
 begin
-  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2-X1, Y2-Y1);
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2 - X1 + Pen.Width, Y2 - Y1 + Pen.Width);
   try
     TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
     SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
@@ -662,7 +993,7 @@ procedure TCustomTransparentCanvas.RoundRect(const X1, Y1, X2, Y2, XRadius, YRad
 var
   TempImage : TAlphaBitmapWrapper;
 begin
-  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2-X1 + Pen.Width, Y2-Y1 + Pen.Width);
+  TempImage := TAlphaBitmapWrapper.CreateForGDI(FWorkingCanvas.FDCHandle, X2 - X1 + Pen.Width, Y2 - Y1 + Pen.Width);
   try
     TempImage.SelectObjects(TGDIObjects.CreateWithHandles(Brush.Handle, Pen.Handle, Font.Handle));
     SetWindowOrgEx(TempImage.FDCHandle, X1 - Pen.Width div 2, Y1 - Pen.Width div 2, nil);
@@ -832,27 +1163,26 @@ begin
   if not CanUseDrawThemeTextEx then raise ETransparentCanvasException.Create('Cannot use DrawThemeTextEx');
 
   AlignFlags := AlignmentToFlags(Alignment);
-  TextSize := ARect.Size; //TextExtent(Text);
+  TextSize := ARect.Size; // TextExtent(Text);
   // Clip by clipping the size of the rectangle it assumes the text fits in
-  TextSize.cx := min(TextSize.cx, ARect.Right-ARect.Left);
-  TextSize.cy := min(TextSize.cy, ARect.Bottom-ARect.Top);
+  TextSize.cx := Min(TextSize.cx, ARect.Right - ARect.Left);
+  TextSize.cy := Min(TextSize.cy, ARect.Bottom - ARect.Top);
   TempImage := TAlphaBitmapWrapper.CreateForDrawThemeTextEx(FWorkingCanvas.FDCHandle, TextSize.cx, TextSize.cy);
   try
     TempImage.SelectObjects(TGDIObjects.CreateWithHandles(0, 0, Font.Handle));
     SetBkMode(TempImage.FDCHandle, TRANSPARENT);
     SetTextColor(TempImage.FDCHandle, ColorToRGB(Font.Color));
 
-		ZeroMemory(@Options, SizeOf(Options));
-		Options.dwSize := SizeOf(Options);
-		Options.dwFlags := DTT_TEXTCOLOR or DTT_COMPOSITED;
-		Options.crText := ColorToRGB(Font.Color);
-		Options.iGlowSize := 0;
+    ZeroMemory(@Options, SizeOf(Options));
+    Options.dwSize := SizeOf(Options);
+    Options.dwFlags := DTT_TEXTCOLOR or DTT_COMPOSITED;
+    Options.crText := ColorToRGB(Font.Color);
+    Options.iGlowSize := 0;
 
-		Details := InternalStyleServices.GetElementDetails(teEditTextNormal);
+    Details := InternalStyleServices.GetElementDetails(teEditTextNormal);
     TextRect := Rect(0, 0, TextSize.cx, TextSize.cy);
     DrawThemeTextEx(InternalStyleServices.Theme[teEdit], TempImage.FDCHandle, Details.Part, Details.State,
-      PChar(Text), Length(Text), AlignFlags or DT_TOP, TextRect,
-      Options);
+      PChar(Text), Length(Text), AlignFlags or DT_TOP, TextRect, Options);
 
     SetBkMode(TempImage.FDCHandle, OPAQUE);
     TempImage.BlendTo(ARect.Left, ARect.Top, FWorkingCanvas, Alpha);
